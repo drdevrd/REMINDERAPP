@@ -8,85 +8,72 @@
     android:background="#0D1117">
 
     <TextView
-        android:text="⏰"
-        android:textSize="64sp"
-        android:gravity="center"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:text="REMINDER"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#E8EAF6"
+        android:gravity="center"
         android:layout_marginBottom="8dp"/>
 
     <TextView
-        android:text="REMINDER"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.2"
-        android:textColor="#E8EAF6"
-        android:gravity="center"
+        android:id="@+id/tvSettings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"/>
-
-    <TextView
-        android:id="@+id/tvSettings"
-        android:text="Default: every 1 min  •  rings 30s"
+        android:text="Default: every 1 min, rings 30s"
         android:textSize="12sp"
         android:textColor="#5C6BC0"
         android:gravity="center"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
         android:layout_marginBottom="24dp"/>
 
     <TextView
         android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:text="Tap QUICK or SCHEDULED"
         android:textSize="15sp"
         android:textColor="#9FA8DA"
         android:gravity="center"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
         android:minHeight="64dp"
         android:layout_marginBottom="28dp"/>
 
-    <!-- QUICK REMINDER -->
     <Button
         android:id="@+id/btnQuick"
-        android:text="⚡  Quick Reminder"
         android:layout_width="match_parent"
         android:layout_height="64dp"
+        android:text="Quick Reminder"
         android:textSize="18sp"
         android:textStyle="bold"
         android:backgroundTint="#1B5E20"
         android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
-    <!-- SCHEDULED REMINDER -->
     <Button
         android:id="@+id/btnScheduled"
-        android:text="🕐  Scheduled Reminder"
         android:layout_width="match_parent"
         android:layout_height="56dp"
+        android:text="Scheduled Reminder"
         android:textSize="16sp"
         android:backgroundTint="#1A237E"
         android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
-    <!-- DEFAULT SETTINGS -->
     <Button
         android:id="@+id/btnDefaultSettings"
-        android:text="⚙  Set Defaults"
         android:layout_width="match_parent"
         android:layout_height="48dp"
+        android:text="Set Defaults"
         android:textSize="14sp"
         android:backgroundTint="#263238"
         android:textColor="#90A4AE"
         android:layout_marginBottom="16dp"/>
 
-    <!-- STOP -->
     <Button
         android:id="@+id/btnStop"
-        android:text="■  STOP"
         android:layout_width="match_parent"
         android:layout_height="56dp"
+        android:text="STOP"
         android:textSize="16sp"
         android:textStyle="bold"
         android:backgroundTint="#B71C1C"
