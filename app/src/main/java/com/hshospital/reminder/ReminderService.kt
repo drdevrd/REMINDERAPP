@@ -28,6 +28,7 @@ class ReminderService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
+        // STOP action — called by StopReceiver
         if (intent?.action == "STOP") {
             ringtone?.stop()
             vibrator?.cancel()
@@ -52,6 +53,7 @@ class ReminderService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Foreground silent persistent notification
         startForeground(NOTIF_ONGOING,
             NotificationCompat.Builder(this, CHANNEL_ONGOING)
                 .setContentTitle("Reminder active")
@@ -64,6 +66,7 @@ class ReminderService : Service() {
                 .build()
         )
 
+        // Ringing notification
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_RING,
             NotificationCompat.Builder(this, CHANNEL_RING)
@@ -80,6 +83,7 @@ class ReminderService : Service() {
                 .build()
         )
 
+        // Play alarm ringtone — bypasses silent mode
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         ringtone = RingtoneManager.getRingtone(this, uri)
@@ -97,6 +101,7 @@ class ReminderService : Service() {
             rt.play()
         }
 
+        // Vibrate — bypasses silent/vibrate settings
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
         } else {
@@ -118,6 +123,7 @@ class ReminderService : Service() {
             vibrator?.vibrate(pattern, 0)
         }
 
+        // Auto-stop after ring_duration_sec
         handler.postDelayed({
             ringtone?.stop()
             vibrator?.cancel()
