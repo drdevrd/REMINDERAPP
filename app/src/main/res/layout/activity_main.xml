@@ -47,6 +47,7 @@
         android:minHeight="64dp"
         android:layout_marginBottom="28dp"/>
 
+    <!-- QUICK REMINDER -->
     <Button
         android:id="@+id/btnQuick"
         android:text="⚡  Quick Reminder"
@@ -58,6 +59,7 @@
         android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
+    <!-- SCHEDULED REMINDER -->
     <Button
         android:id="@+id/btnScheduled"
         android:text="🕐  Scheduled Reminder"
@@ -68,6 +70,7 @@
         android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
+    <!-- DEFAULT SETTINGS -->
     <Button
         android:id="@+id/btnDefaultSettings"
         android:text="⚙  Set Defaults"
@@ -78,6 +81,7 @@
         android:textColor="#90A4AE"
         android:layout_marginBottom="16dp"/>
 
+    <!-- STOP -->
     <Button
         android:id="@+id/btnStop"
         android:text="■  STOP"
