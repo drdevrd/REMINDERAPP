@@ -80,20 +80,12 @@ class MainActivity : AppCompatActivity() {
         val ringSec = prefs.getInt("ring_duration_sec", 30)
         val intervalMin = prefs.getInt("interval_minutes", 1)
 
-        val serviceIntent = Intent(this, ReminderService::class.java)
-        serviceIntent.putExtra("reminder_text", text)
-        serviceIntent.putExtra("ring_duration_sec", ringSec)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
-
-        scheduleRepeating(text, intervalMin, ringSec)
+        // Schedule first ring after 1 interval from now (do NOT ring immediately)
+        val firstTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
+        scheduleRepeating(text, intervalMin, ringSec, firstTrigger)
         prefs.edit().putBoolean("is_running", true).apply()
         updateUI()
-        Toast.makeText(this, "Reminder started!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "First reminder in $intervalMin min", Toast.LENGTH_SHORT).show()
     }
 
     private fun showDefaultSettings() {
