@@ -6,8 +6,10 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -42,12 +44,31 @@ class MainActivity : AppCompatActivity() {
         btnStop = findViewById(R.id.btnStop)
         btnDefaultSettings = findViewById(R.id.btnDefaultSettings)
 
+        requestBatteryOptimizationExemption()
         updateUI()
 
         btnQuick.setOnClickListener { showQuickDialog() }
         btnScheduled.setOnClickListener { showStep1Text() }
         btnStop.setOnClickListener { stopAll() }
         btnDefaultSettings.setOnClickListener { showDefaultSettings() }
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                AlertDialog.Builder(this)
+                    .setTitle("Important: Allow Background Alerts")
+                    .setMessage("To ensure reminders ring even when phone is locked, please tap Allow on the next screen.")
+                    .setPositiveButton("Allow") { _, _ ->
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        intent.data = Uri.parse("package:$packageName")
+                        startActivity(intent)
+                    }
+                    .setNegativeButton("Skip", null)
+                    .show()
+            }
+        }
     }
 
     private fun showQuickDialog() {
@@ -79,8 +100,6 @@ class MainActivity : AppCompatActivity() {
     private fun startImmediately(text: String) {
         val ringSec = prefs.getInt("ring_duration_sec", 30)
         val intervalMin = prefs.getInt("interval_minutes", 1)
-
-        // Schedule first ring after 1 interval from now (do NOT ring immediately)
         val firstTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
         scheduleRepeating(text, intervalMin, ringSec, firstTrigger)
         prefs.edit().putBoolean("is_running", true).apply()
@@ -307,13 +326,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatSec(sec: Int): String {
-        return if (sec < 60) {
-            "${sec}s"
-        } else if (sec == 60) {
-            "1 min"
-        } else {
-            "${sec / 60} min"
-        }
+        return if (sec < 60) "${sec}s" else if (sec == 60) "1 min" else "${sec / 60} min"
     }
 
     override fun onResume() {
