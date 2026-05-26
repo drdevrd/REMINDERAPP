@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -23,6 +24,7 @@ class ReminderService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var ringtone: android.media.Ringtone? = null
     private var vibrator: Vibrator? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     companion object {
         const val CHANNEL_RING = "reminder_ring"
@@ -39,29 +41,24 @@ class ReminderService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
         if (intent?.action == "STOP") {
-            ringtone?.stop()
-            vibrator?.cancel()
-            handler.removeCallbacksAndMessages(null)
-            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(NOTIF_RING)
-            nm.cancel(NOTIF_ONGOING)
-            stopForeground(true)
-            stopSelf()
+            cleanup()
             return START_NOT_STICKY
         }
 
         val text = intent?.getStringExtra("reminder_text") ?: "Reminder"
         val ringSec = intent?.getIntExtra("ring_duration_sec", 30) ?: 30
 
-        val stopIntent = Intent(this, StopReceiver::class.java)
+        // Acquire wake lock — keeps CPU awake while screen is off
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::RingWakeLock")
+        wakeLock?.acquire((ringSec + 10) * 1000L)
+
         val stopPi = PendingIntent.getBroadcast(
-            this, 1, stopIntent,
+            this, 1, Intent(this, StopReceiver::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        val openIntent = Intent(this, MainActivity::class.java)
         val openPi = PendingIntent.getActivity(
-            this, 0, openIntent,
+            this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -93,7 +90,7 @@ class ReminderService : Service() {
                 .build()
         )
 
-        // Play ringtone
+        // Play ringtone via STREAM_ALARM — works even on silent
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         ringtone = RingtoneManager.getRingtone(this, uri)
@@ -109,41 +106,56 @@ class ReminderService : Service() {
         }
         ringtone?.play()
 
-        // Vibrate only if phone vibration is ON
+        // Vibrate ONLY if user has vibration enabled (not silent, not vibration-off)
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val ringerMode = audioManager.ringerMode
-        if (ringerMode == AudioManager.RINGER_MODE_NORMAL || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
-            vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (audioManager.ringerMode == AudioManager.RINGER_MODE_VIBRATE ||
+            audioManager.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+            val vib = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
             } else {
                 @Suppress("DEPRECATION")
                 getSystemService(VIBRATOR_SERVICE) as Vibrator
             }
-            val pattern = longArrayOf(0, 800, 400, 800, 400, 800, 400)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
+            // Check if vibration is actually enabled in system settings
+            val vibrateWhenRinging = android.provider.Settings.System.getInt(
+                contentResolver,
+                android.provider.Settings.System.VIBRATE_WHEN_RINGING, 0
+            )
+            if (vibrateWhenRinging == 1 || audioManager.ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+                vibrator = vib
+                val pattern = longArrayOf(0, 800, 400, 800, 400)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vib.vibrate(VibrationEffect.createWaveform(pattern, 0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vib.vibrate(pattern, 0)
+                }
             }
         }
 
         handler.postDelayed({
-            ringtone?.stop()
-            vibrator?.cancel()
-            nm.cancel(NOTIF_RING)
-            stopForeground(true)
-            stopSelf()
+            cleanup()
         }, ringSec * 1000L)
 
         return START_NOT_STICKY
     }
 
+    private fun cleanup() {
+        ringtone?.stop()
+        vibrator?.cancel()
+        wakeLock?.let { if (it.isHeld) it.release() }
+        handler.removeCallbacksAndMessages(null)
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(NOTIF_RING)
+        nm.cancel(NOTIF_ONGOING)
+        stopForeground(true)
+        stopSelf()
+    }
+
     private fun createChannels() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-
         val ringChannel = NotificationChannel(CHANNEL_RING, "Reminder Alarm", NotificationManager.IMPORTANCE_HIGH)
-        ringChannel.enableVibration(true)
+        ringChannel.enableVibration(false)
         ringChannel.setSound(
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
             AudioAttributes.Builder()
@@ -160,9 +172,7 @@ class ReminderService : Service() {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
-        ringtone?.stop()
-        vibrator?.cancel()
+        cleanup()
         super.onDestroy()
     }
 
