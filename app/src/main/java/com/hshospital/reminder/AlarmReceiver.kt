@@ -18,26 +18,22 @@ class AlarmReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("is_running", false)) return
 
-        // Acquire wake lock so CPU stays awake to ring
+        // Wake lock so CPU stays awake long enough to start service
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "ReminderApp::AlarmWakeLock"
-        )
-        wakeLock.acquire(60 * 1000L) // hold for max 60 seconds
+        val wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::AlarmWakeLock")
+        wakeLock.acquire(60 * 1000L)
 
-        // Start service to ring
+        // Start ringing service
         val serviceIntent = Intent(context, ReminderService::class.java)
         serviceIntent.putExtra("reminder_text", text)
         serviceIntent.putExtra("ring_duration_sec", ringSec)
-        serviceIntent.putExtra("wake_lock", true)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)
         } else {
             context.startService(serviceIntent)
         }
 
-        // Schedule NEXT alarm
+        // Schedule next alarm
         val nextTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
         val nextIntent = Intent(context, AlarmReceiver::class.java)
         nextIntent.putExtra("reminder_text", text)
