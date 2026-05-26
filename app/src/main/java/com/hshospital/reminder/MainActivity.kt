@@ -283,11 +283,12 @@ class MainActivity : AppCompatActivity() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, firstTrigger, pi)
-        } else {
-            am.setExact(AlarmManager.RTC_WAKEUP, firstTrigger, pi)
-        }
+        val showIntent = Intent(this, MainActivity::class.java)
+        val showPi = PendingIntent.getActivity(
+            this, 0, showIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        am.setAlarmClock(AlarmManager.AlarmClockInfo(firstTrigger, showPi), pi)
     }
 
     private fun stopAll() {
