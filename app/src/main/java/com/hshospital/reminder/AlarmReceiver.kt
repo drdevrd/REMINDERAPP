@@ -18,7 +18,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("is_running", false)) return
 
-        // Wake lock so CPU stays awake long enough to start service
+        // Wake lock — keeps CPU alive to start service
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::AlarmWakeLock")
         wakeLock.acquire(60 * 1000L)
@@ -33,8 +33,9 @@ class AlarmReceiver : BroadcastReceiver() {
             context.startService(serviceIntent)
         }
 
-        // Schedule next alarm
+        // Schedule next alarm using setAlarmClock — highest priority, wakes screen like a clock alarm
         val nextTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
+
         val nextIntent = Intent(context, AlarmReceiver::class.java)
         nextIntent.putExtra("reminder_text", text)
         nextIntent.putExtra("interval_minutes", intervalMin)
@@ -44,12 +45,17 @@ class AlarmReceiver : BroadcastReceiver() {
             context, 0, nextIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        // showIntent — opens app when user taps the alarm clock icon in status bar
+        val showIntent = Intent(context, MainActivity::class.java)
+        val showPi = PendingIntent.getActivity(
+            context, 0, showIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTrigger, pi)
-        } else {
-            am.setExact(AlarmManager.RTC_WAKEUP, nextTrigger, pi)
-        }
+        // setAlarmClock bypasses Doze, battery saver, and OEM restrictions
+        am.setAlarmClock(AlarmManager.AlarmClockInfo(nextTrigger, showPi), pi)
 
         wakeLock.release()
     }
