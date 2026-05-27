@@ -103,6 +103,10 @@ class MainActivity : AppCompatActivity() {
         val firstTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
         scheduleRepeating(text, intervalMin, ringSec, firstTrigger)
         prefs.edit().putBoolean("is_running", true).apply()
+        // Start persistent service to keep alive
+        val persistIntent = Intent(this, PersistentService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(persistIntent)
+        else startService(persistIntent)
         updateUI()
         Toast.makeText(this, "First reminder in $intervalMin min", Toast.LENGTH_SHORT).show()
     }
@@ -303,6 +307,9 @@ class MainActivity : AppCompatActivity() {
         startService(stopIntent)
 
         prefs.edit().putBoolean("is_running", false).apply()
+        val persistStopIntent = Intent(this, PersistentService::class.java)
+        persistStopIntent.action = "STOP"
+        startService(persistStopIntent)
         updateUI()
         Toast.makeText(this, "Reminder stopped", Toast.LENGTH_SHORT).show()
     }
