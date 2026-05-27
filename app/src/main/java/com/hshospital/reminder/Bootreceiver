@@ -18,9 +18,10 @@ class BootReceiver : BroadcastReceiver() {
         val text        = prefs.getString("reminder_text", "") ?: return
         val intervalMin = prefs.getInt("interval_minutes", 1)
         val ringSec     = prefs.getInt("ring_duration_sec", 30)
-
-        // Reschedule alarm after reboot
         val nextTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
+
+        prefs.edit().putLong("next_trigger", nextTrigger).apply()
+
         val alarmIntent = Intent(context, AlarmReceiver::class.java)
         alarmIntent.putExtra("reminder_text", text)
         alarmIntent.putExtra("interval_minutes", intervalMin)
@@ -30,11 +31,20 @@ class BootReceiver : BroadcastReceiver() {
             context, 0, alarmIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val showPi = PendingIntent.getActivity(
+            context, 0, Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTrigger, pi)
+        am.setAlarmClock(AlarmManager.AlarmClockInfo(nextTrigger, showPi), pi)
+
+        // Restart persistent service
+        val persistIntent = Intent(context, PersistentService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(persistIntent)
         } else {
-            am.setExact(AlarmManager.RTC_WAKEUP, nextTrigger, pi)
+            context.startService(persistIntent)
         }
     }
 }
