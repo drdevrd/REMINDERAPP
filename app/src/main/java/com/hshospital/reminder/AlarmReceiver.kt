@@ -18,12 +18,12 @@ class AlarmReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("is_running", false)) return
 
-        // Wake lock — keeps CPU alive to start service
+        // Wake lock
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::AlarmWakeLock")
         wakeLock.acquire(60 * 1000L)
 
-        // Start ringing service
+        // Start ringing
         val serviceIntent = Intent(context, ReminderService::class.java)
         serviceIntent.putExtra("reminder_text", text)
         serviceIntent.putExtra("ring_duration_sec", ringSec)
@@ -33,8 +33,11 @@ class AlarmReceiver : BroadcastReceiver() {
             context.startService(serviceIntent)
         }
 
-        // Schedule next alarm using setAlarmClock — highest priority, wakes screen like a clock alarm
+        // Schedule next alarm
         val nextTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
+
+        // Save next trigger time for watchdog
+        prefs.edit().putLong("next_trigger", nextTrigger).apply()
 
         val nextIntent = Intent(context, AlarmReceiver::class.java)
         nextIntent.putExtra("reminder_text", text)
@@ -45,16 +48,12 @@ class AlarmReceiver : BroadcastReceiver() {
             context, 0, nextIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        // showIntent — opens app when user taps the alarm clock icon in status bar
-        val showIntent = Intent(context, MainActivity::class.java)
         val showPi = PendingIntent.getActivity(
-            context, 0, showIntent,
+            context, 0, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        // setAlarmClock bypasses Doze, battery saver, and OEM restrictions
         am.setAlarmClock(AlarmManager.AlarmClockInfo(nextTrigger, showPi), pi)
 
         wakeLock.release()
