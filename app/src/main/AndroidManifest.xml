@@ -34,13 +34,13 @@
             android:foregroundServiceType="mediaPlayback"
             android:exported="false" />
 
-        <receiver
-            android:name=".AlarmReceiver"
+        <service
+            android:name=".PersistentService"
+            android:foregroundServiceType="mediaPlayback"
             android:exported="false" />
 
-        <receiver
-            android:name=".StopReceiver"
-            android:exported="false" />
+        <receiver android:name=".AlarmReceiver" android:exported="false" />
+        <receiver android:name=".StopReceiver" android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"
