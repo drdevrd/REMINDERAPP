@@ -1,8 +1,11 @@
 package com.hshospital.reminder
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.net.Uri
+import android.app.Notification
+import android.net.UriChannel
+import android.app.Notification
+import android.net.UriManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
@@ -27,7 +30,7 @@ class ReminderService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     companion object {
-        const val CHANNEL_RING = "reminder_ring"
+        const val CHANNEL_RING = "reminder_ring_v2"
         const val CHANNEL_ONGOING = "reminder_ongoing"
         const val NOTIF_RING = 2001
         const val NOTIF_ONGOING = 2002
@@ -91,8 +94,11 @@ class ReminderService : Service() {
         )
 
         // Play ringtone — NOT looping, plays once
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        val prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
+        val savedUri = prefs.getString("ringtone_uri", null)
+        val uri = if (savedUri != null) android.net.Uri.parse(savedUri)
+                  else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                      ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         ringtone = RingtoneManager.getRingtone(this, uri)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             ringtone?.isLooping = false  // play once, not loop
