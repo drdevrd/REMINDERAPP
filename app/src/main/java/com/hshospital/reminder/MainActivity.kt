@@ -7,7 +7,6 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.net.Uri
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -61,8 +60,8 @@ class MainActivity : AppCompatActivity() {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             if (!pm.isIgnoringBatteryOptimizations(packageName)) {
                 AlertDialog.Builder(this)
-                    .setTitle("Important: Allow Background Alerts")
-                    .setMessage("To ensure reminders ring even when phone is locked, please tap Allow on the next screen.")
+                    .setTitle("Allow Background Alerts")
+                    .setMessage("Tap Allow to ensure reminders ring when phone is locked.")
                     .setPositiveButton("Allow") { _, _ ->
                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                         intent.data = Uri.parse("package:$packageName")
@@ -106,7 +105,6 @@ class MainActivity : AppCompatActivity() {
         val firstTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
         scheduleRepeating(text, intervalMin, ringSec, firstTrigger)
         prefs.edit().putBoolean("is_running", true).apply()
-        // Start persistent service to keep alive
         val persistIntent = Intent(this, PersistentService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(persistIntent)
         else startService(persistIntent)
@@ -150,7 +148,6 @@ class MainActivity : AppCompatActivity() {
         spinnerRing.setSelection(selRing)
         layout.addView(spinnerRing)
 
-        // Sound picker button
         val tv3 = TextView(this)
         tv3.text = "Notification sound:"
         tv3.textSize = 14f
@@ -159,10 +156,10 @@ class MainActivity : AppCompatActivity() {
 
         val btnSound = Button(this)
         val savedUri = prefs.getString("ringtone_uri", null)
-        val currentSoundName = if (savedUri != null) {
+        val currentName = if (savedUri != null) {
             RingtoneManager.getRingtone(this, Uri.parse(savedUri))?.getTitle(this) ?: "Default Alarm"
         } else "Default Alarm"
-        btnSound.text = currentSoundName
+        btnSound.text = currentName
         btnSound.setOnClickListener {
             val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
             intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
@@ -197,10 +194,10 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 999 && resultCode == Activity.RESULT_OK) {
-            val uri = data?.getParcelableExtra<android.os.Parcelable>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            val uri = data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             if (uri != null) {
                 prefs.edit().putString("ringtone_uri", uri.toString()).apply()
-                val name = RingtoneManager.getRingtone(this, uri as Uri)?.getTitle(this) ?: "Selected"
+                val name = RingtoneManager.getRingtone(this, uri)?.getTitle(this) ?: "Selected"
                 Toast.makeText(this, "Sound: $name", Toast.LENGTH_SHORT).show()
             }
         }
@@ -311,6 +308,9 @@ class MainActivity : AppCompatActivity() {
 
         scheduleRepeating(text, intervalMin, ringSec, cal.timeInMillis)
         prefs.edit().putBoolean("is_running", true).apply()
+        val persistIntent = Intent(this, PersistentService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(persistIntent)
+        else startService(persistIntent)
         updateUI()
 
         val h12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
@@ -328,12 +328,11 @@ class MainActivity : AppCompatActivity() {
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val showIntent = Intent(this, MainActivity::class.java)
         val showPi = PendingIntent.getActivity(
-            this, 0, showIntent,
+            this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.setAlarmClock(AlarmManager.AlarmClockInfo(firstTrigger, showPi), pi)
     }
 
@@ -348,10 +347,11 @@ class MainActivity : AppCompatActivity() {
         stopIntent.action = "STOP"
         startService(stopIntent)
 
-        prefs.edit().putBoolean("is_running", false).apply()
         val persistStopIntent = Intent(this, PersistentService::class.java)
         persistStopIntent.action = "STOP"
         startService(persistStopIntent)
+
+        prefs.edit().putBoolean("is_running", false).apply()
         updateUI()
         Toast.makeText(this, "Reminder stopped", Toast.LENGTH_SHORT).show()
     }
