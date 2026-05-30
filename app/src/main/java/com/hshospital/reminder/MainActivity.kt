@@ -1,11 +1,14 @@
 package com.hshospital.reminder
 
+import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -147,6 +150,32 @@ class MainActivity : AppCompatActivity() {
         spinnerRing.setSelection(selRing)
         layout.addView(spinnerRing)
 
+        // Sound picker button
+        val tv3 = TextView(this)
+        tv3.text = "Notification sound:"
+        tv3.textSize = 14f
+        tv3.setPadding(0, 24, 0, 0)
+        layout.addView(tv3)
+
+        val btnSound = Button(this)
+        val savedUri = prefs.getString("ringtone_uri", null)
+        val currentSoundName = if (savedUri != null) {
+            RingtoneManager.getRingtone(this, Uri.parse(savedUri))?.getTitle(this) ?: "Default Alarm"
+        } else "Default Alarm"
+        btnSound.text = currentSoundName
+        btnSound.setOnClickListener {
+            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+            intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+            intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+            intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Reminder Sound")
+            if (savedUri != null) {
+                intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(savedUri))
+            }
+            startActivityForResult(intent, 999)
+        }
+        layout.addView(btnSound)
+
         AlertDialog.Builder(this)
             .setTitle("Set Defaults")
             .setView(layout)
@@ -162,6 +191,19 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 999 && resultCode == Activity.RESULT_OK) {
+            val uri = data?.getParcelableExtra<android.os.Parcelable>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                prefs.edit().putString("ringtone_uri", uri.toString()).apply()
+                val name = RingtoneManager.getRingtone(this, uri as Uri)?.getTitle(this) ?: "Selected"
+                Toast.makeText(this, "Sound: $name", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showStep1Text() {
