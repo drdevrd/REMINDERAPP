@@ -1,17 +1,15 @@
 package com.hshospital.reminder
 
 import android.app.Notification
-import android.net.Uri
-import android.app.Notification
-import android.net.UriChannel
-import android.app.Notification
-import android.net.UriManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -51,7 +49,6 @@ class ReminderService : Service() {
         val text = intent?.getStringExtra("reminder_text") ?: "Reminder"
         val ringSec = intent?.getIntExtra("ring_duration_sec", 30) ?: 30
 
-        // Wake lock held for exactly ringSec + 5 seconds — ensures handler fires while screen locked
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::RingWakeLock")
         wakeLock?.acquire((ringSec + 5) * 1000L)
@@ -93,15 +90,16 @@ class ReminderService : Service() {
                 .build()
         )
 
-        // Play ringtone — NOT looping, plays once
+        // Use saved ringtone or default alarm
         val prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
         val savedUri = prefs.getString("ringtone_uri", null)
-        val uri = if (savedUri != null) android.net.Uri.parse(savedUri)
-                  else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                      ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        val uri: Uri = if (savedUri != null) Uri.parse(savedUri)
+                       else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                           ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+
         ringtone = RingtoneManager.getRingtone(this, uri)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            ringtone?.isLooping = false  // play once, not loop
+            ringtone?.isLooping = false
             ringtone?.audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -114,33 +112,26 @@ class ReminderService : Service() {
 
         // Vibrate only if phone vibration is ON
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        if (audioManager.ringerMode == AudioManager.RINGER_MODE_VIBRATE ||
-            audioManager.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
-            val vibrateWhenRinging = android.provider.Settings.System.getInt(
-                contentResolver,
-                android.provider.Settings.System.VIBRATE_WHEN_RINGING, 0
-            )
-            if (vibrateWhenRinging == 1 || audioManager.ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
-                vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-                } else {
-                    @Suppress("DEPRECATION")
-                    getSystemService(VIBRATOR_SERVICE) as Vibrator
-                }
-                val pattern = longArrayOf(0, 800, 400, 800, 400)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1)) // -1 = no repeat
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator?.vibrate(pattern, -1)
-                }
+        val vibrateWhenRinging = android.provider.Settings.System.getInt(
+            contentResolver, android.provider.Settings.System.VIBRATE_WHEN_RINGING, 0
+        )
+        if (vibrateWhenRinging == 1 || audioManager.ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+            vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(VIBRATOR_SERVICE) as Vibrator
+            }
+            val pattern = longArrayOf(0, 800, 400, 800, 400)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(pattern, -1)
             }
         }
 
-        // Stop after ringSec — wake lock ensures this runs even when screen is locked
-        handler.postDelayed({
-            cleanup()
-        }, ringSec * 1000L)
+        handler.postDelayed({ cleanup() }, ringSec * 1000L)
 
         return START_NOT_STICKY
     }
