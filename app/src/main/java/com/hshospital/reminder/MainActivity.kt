@@ -7,6 +7,7 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.media.MediaRecorder
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -22,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import java.io.File
 import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
@@ -33,6 +35,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnScheduled: Button
     private lateinit var btnStop: Button
     private lateinit var btnDefaultSettings: Button
+
+    private var mediaRecorder: MediaRecorder? = null
+    private var isRecording = false
+    private val recordingFile by lazy { File(filesDir, "reminder_recording.m4a").absolutePath }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -148,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         spinnerRing.setSelection(selRing)
         layout.addView(spinnerRing)
 
+        // Sound picker
         val tv3 = TextView(this)
         tv3.text = "Notification sound:"
         tv3.textSize = 14f
@@ -173,10 +180,43 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(btnSound)
 
+        // Voice recording
+        val tv4 = TextView(this)
+        tv4.text = "Voice recording (optional):"
+        tv4.textSize = 14f
+        tv4.setPadding(0, 24, 0, 0)
+        layout.addView(tv4)
+
+        val hasRecording = File(recordingFile).exists()
+        val btnRecord = Button(this)
+        btnRecord.text = if (hasRecording) "🎤 Re-record" else "🎤 Record Voice"
+        layout.addView(btnRecord)
+
+        val btnDeleteRec = Button(this)
+        btnDeleteRec.text = "🗑 Delete Recording"
+        btnDeleteRec.isEnabled = hasRecording
+        layout.addView(btnDeleteRec)
+
+        btnRecord.setOnClickListener {
+            if (!isRecording) {
+                startRecording(btnRecord, btnDeleteRec)
+            } else {
+                stopRecording(btnRecord, btnDeleteRec)
+            }
+        }
+
+        btnDeleteRec.setOnClickListener {
+            File(recordingFile).delete()
+            btnDeleteRec.isEnabled = false
+            btnRecord.text = "🎤 Record Voice"
+            Toast.makeText(this, "Recording deleted", Toast.LENGTH_SHORT).show()
+        }
+
         AlertDialog.Builder(this)
             .setTitle("Set Defaults")
             .setView(layout)
             .setPositiveButton("Save") { _, _ ->
+                if (isRecording) stopRecording(btnRecord, btnDeleteRec)
                 val newInterval = intervalValues[spinnerInterval.selectedItemPosition]
                 val newRing = ringValues[spinnerRing.selectedItemPosition]
                 prefs.edit()
@@ -188,6 +228,50 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun startRecording(btn: Button, btnDelete: Button) {
+        val ringSec = prefs.getInt("ring_duration_sec", 30)
+        try {
+            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(this)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            mediaRecorder?.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setOutputFile(recordingFile)
+                setMaxDuration(ringSec * 1000)
+                prepare()
+                start()
+                setOnInfoListener { _, what, _ ->
+                    if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                        stopRecording(btn, btnDelete)
+                    }
+                }
+            }
+            isRecording = true
+            btn.text = "🔴 Recording... (auto-stops in ${formatSec(ringSec)})"
+            Toast.makeText(this, "Recording for ${formatSec(ringSec)}...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Mic permission needed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun stopRecording(btn: Button, btnDelete: Button) {
+        try {
+            mediaRecorder?.apply { stop(); release() }
+            mediaRecorder = null
+            isRecording = false
+            btn.text = "🎤 Re-record"
+            btnDelete.isEnabled = true
+            Toast.makeText(this, "Recording saved", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            isRecording = false
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -307,7 +391,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         scheduleRepeating(text, intervalMin, ringSec, cal.timeInMillis)
-        prefs.edit().putBoolean("is_running", true).apply()
+        prefs.edit().putBoolean("is_running", true).putLong("next_trigger", cal.timeInMillis).apply()
         val persistIntent = Intent(this, PersistentService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(persistIntent)
         else startService(persistIntent)
@@ -382,5 +466,13 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateUI()
+    }
+
+    override fun onDestroy() {
+        if (isRecording) {
+            mediaRecorder?.apply { stop(); release() }
+            mediaRecorder = null
+        }
+        super.onDestroy()
     }
 }
