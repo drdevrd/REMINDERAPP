@@ -32,8 +32,9 @@ class PersistentService : Service() {
                 val ringSec     = prefs.getInt("ring_duration_sec", 30)
                 val nextTrigger = prefs.getLong("next_trigger", 0L)
 
-                // If next trigger is in the past, re-arm it
-                if (nextTrigger > 0 && nextTrigger < System.currentTimeMillis() + 5000) {
+                // Only re-arm if next_trigger was set AND is overdue by more than 2 minutes
+                val now = System.currentTimeMillis()
+                if (nextTrigger > 0 && nextTrigger < now - 2 * 60 * 1000L) {
                     reArmAlarm(text, intervalMin, ringSec)
                 }
             }
