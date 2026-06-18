@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -19,11 +20,13 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
+import java.io.File
 
 class ReminderService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var ringtone: android.media.Ringtone? = null
+    private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -32,6 +35,8 @@ class ReminderService : Service() {
         const val CHANNEL_ONGOING = "reminder_ongoing"
         const val NOTIF_RING = 2001
         const val NOTIF_ONGOING = 2002
+        const val ACTION_PLAY_RECORDING = "PLAY_RECORDING"
+        const val ACTION_STOP = "STOP"
     }
 
     override fun onCreate() {
@@ -41,13 +46,14 @@ class ReminderService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
-        if (intent?.action == "STOP") {
-            cleanup()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> { cleanup(); return START_NOT_STICKY }
+            ACTION_PLAY_RECORDING -> { playRecording(); return START_NOT_STICKY }
         }
 
         val text = intent?.getStringExtra("reminder_text") ?: "Reminder"
         val ringSec = intent?.getIntExtra("ring_duration_sec", 30) ?: 30
+        val intervalMin = intent?.getIntExtra("interval_minutes", 1) ?: 1
 
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::RingWakeLock")
@@ -61,6 +67,13 @@ class ReminderService : Service() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val playPi = PendingIntent.getService(
+            this, 2,
+            Intent(this, ReminderService::class.java).apply { action = ACTION_PLAY_RECORDING },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
 
         startForeground(NOTIF_ONGOING,
             NotificationCompat.Builder(this, CHANNEL_ONGOING)
@@ -75,22 +88,25 @@ class ReminderService : Service() {
         )
 
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIF_RING,
-            NotificationCompat.Builder(this, CHANNEL_RING)
-                .setContentTitle("REMINDER")
-                .setContentText(text)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentIntent(openPi)
-                .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
-                .setAutoCancel(false)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .build()
-        )
+        val ringBuilder = NotificationCompat.Builder(this, CHANNEL_RING)
+            .setContentTitle("REMINDER")
+            .setContentText("$text  •  Every $intervalMin min")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentIntent(openPi)
+            .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
+            .setAutoCancel(false)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSound(null)
 
-        // Use saved ringtone or default alarm
+        if (hasRecording) {
+            ringBuilder.addAction(android.R.drawable.ic_media_play, "PLAY", playPi)
+        }
+
+        nm.notify(NOTIF_RING, ringBuilder.build())
+
         val prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
         val savedUri = prefs.getString("ringtone_uri", null)
         val uri: Uri = if (savedUri != null) Uri.parse(savedUri)
@@ -110,7 +126,6 @@ class ReminderService : Service() {
         }
         ringtone?.play()
 
-        // Vibrate only if phone vibration is ON
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         val vibrateWhenRinging = android.provider.Settings.System.getInt(
             contentResolver, android.provider.Settings.System.VIBRATE_WHEN_RINGING, 0
@@ -136,9 +151,33 @@ class ReminderService : Service() {
         return START_NOT_STICKY
     }
 
+    private fun playRecording() {
+        val file = File(filesDir, "reminder_recording.m4a")
+        if (!file.exists()) return
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(file.absolutePath)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                prepare()
+                start()
+                setOnCompletionListener { release(); mediaPlayer = null }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun cleanup() {
         ringtone?.stop()
         ringtone = null
+        mediaPlayer?.release()
+        mediaPlayer = null
         vibrator?.cancel()
         vibrator = null
         handler.removeCallbacksAndMessages(null)
@@ -156,13 +195,7 @@ class ReminderService : Service() {
 
         val ringChannel = NotificationChannel(CHANNEL_RING, "Reminder Alarm", NotificationManager.IMPORTANCE_HIGH)
         ringChannel.enableVibration(false)
-        ringChannel.setSound(
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-        )
+        ringChannel.setSound(null, null)
         ringChannel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(ringChannel)
 
