@@ -29,12 +29,19 @@ import java.util.Calendar
 class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: SharedPreferences
-    private lateinit var tvStatus: TextView
+
     private lateinit var tvSettings: TextView
-    private lateinit var btnQuick: Button
-    private lateinit var btnScheduled: Button
-    private lateinit var btnStop: Button
+    private lateinit var btnSlot1: Button
+    private lateinit var btnSlot2: Button
+    private lateinit var btnSlot3: Button
+    private lateinit var btnStop1: Button
+    private lateinit var btnStop2: Button
+    private lateinit var btnStop3: Button
+    private lateinit var btnRename1: Button
+    private lateinit var btnRename2: Button
+    private lateinit var btnRename3: Button
     private lateinit var btnDefaultSettings: Button
+    private lateinit var btnStopAll: Button
 
     private var mediaRecorder: MediaRecorder? = null
     private var isRecording = false
@@ -45,20 +52,34 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
-        tvStatus = findViewById(R.id.tvStatus)
-        tvSettings = findViewById(R.id.tvSettings)
-        btnQuick = findViewById(R.id.btnQuick)
-        btnScheduled = findViewById(R.id.btnScheduled)
-        btnStop = findViewById(R.id.btnStop)
-        btnDefaultSettings = findViewById(R.id.btnDefaultSettings)
+
+        tvSettings        = findViewById(R.id.tvSettings)
+        btnSlot1          = findViewById(R.id.btnSlot1)
+        btnSlot2          = findViewById(R.id.btnSlot2)
+        btnSlot3          = findViewById(R.id.btnSlot3)
+        btnStop1          = findViewById(R.id.btnStop1)
+        btnStop2          = findViewById(R.id.btnStop2)
+        btnStop3          = findViewById(R.id.btnStop3)
+        btnRename1        = findViewById(R.id.btnRename1)
+        btnRename2        = findViewById(R.id.btnRename2)
+        btnRename3        = findViewById(R.id.btnRename3)
+        btnDefaultSettings= findViewById(R.id.btnDefaultSettings)
+        btnStopAll        = findViewById(R.id.btnStopAll)
 
         requestBatteryOptimizationExemption()
         updateUI()
 
-        btnQuick.setOnClickListener { showQuickDialog() }
-        btnScheduled.setOnClickListener { showStep1Text() }
-        btnStop.setOnClickListener { stopAll() }
+        btnSlot1.setOnClickListener { showQuickDialog(1) }
+        btnSlot2.setOnClickListener { showQuickDialog(2) }
+        btnSlot3.setOnClickListener { showQuickDialog(3) }
+        btnStop1.setOnClickListener { stopSlot(1) }
+        btnStop2.setOnClickListener { stopSlot(2) }
+        btnStop3.setOnClickListener { stopSlot(3) }
+        btnRename1.setOnClickListener { showRenameDialog(1) }
+        btnRename2.setOnClickListener { showRenameDialog(2) }
+        btnRename3.setOnClickListener { showRenameDialog(3) }
         btnDefaultSettings.setOnClickListener { showDefaultSettings() }
+        btnStopAll.setOnClickListener { stopAllSlots() }
     }
 
     private fun requestBatteryOptimizationExemption() {
@@ -79,43 +100,132 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showQuickDialog() {
+    private fun showRenameDialog(slot: Int) {
+        val input = EditText(this)
+        input.setPadding(48, 24, 48, 24)
+        input.setText(prefs.getString("slot${slot}_name", "Reminder $slot"))
+        input.hint = "Button name"
+
+        AlertDialog.Builder(this)
+            .setTitle("Rename Reminder $slot")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val name = input.text.toString().trim().ifEmpty { "Reminder $slot" }
+                prefs.edit().putString("slot${slot}_name", name).apply()
+                updateUI()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showQuickDialog(slot: Int) {
         val input = EditText(this)
         input.hint = "Type your reminder..."
         input.setPadding(48, 24, 48, 24)
-        input.setText(prefs.getString("reminder_text", ""))
+        input.setText(prefs.getString("slot${slot}_text", ""))
 
         val interval = prefs.getInt("interval_minutes", 1)
         val ringSec = prefs.getInt("ring_duration_sec", 30)
+        val slotName = prefs.getString("slot${slot}_name", "Reminder $slot") ?: "Reminder $slot"
 
         AlertDialog.Builder(this)
-            .setTitle("Quick Reminder")
-            .setMessage("Repeats every $interval min, Rings for ${formatSec(ringSec)}")
+            .setTitle(slotName)
+            .setMessage("Repeats every $interval min  •  Rings for ${formatSec(ringSec)}")
             .setView(input)
-            .setPositiveButton("START NOW") { _, _ ->
+            .setPositiveButton("START") { _, _ ->
                 val text = input.text.toString().trim()
                 if (text.isEmpty()) {
                     Toast.makeText(this, "Please enter reminder text", Toast.LENGTH_SHORT).show()
                 } else {
-                    prefs.edit().putString("reminder_text", text).apply()
-                    startImmediately(text)
+                    prefs.edit().putString("slot${slot}_text", text).apply()
+                    startSlot(slot, text)
                 }
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    private fun startImmediately(text: String) {
+    private fun startSlot(slot: Int, text: String) {
         val ringSec = prefs.getInt("ring_duration_sec", 30)
         val intervalMin = prefs.getInt("interval_minutes", 1)
         val firstTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
-        scheduleRepeating(text, intervalMin, ringSec, firstTrigger)
-        prefs.edit().putBoolean("is_running", true).apply()
+
+        val intent = Intent(this, AlarmReceiver::class.java)
+        intent.putExtra("reminder_text", text)
+        intent.putExtra("interval_minutes", intervalMin)
+        intent.putExtra("ring_duration_sec", ringSec)
+        intent.putExtra("slot", slot)
+
+        val pi = PendingIntent.getBroadcast(
+            this, slot, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val showPi = PendingIntent.getActivity(
+            this, slot, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        am.setAlarmClock(AlarmManager.AlarmClockInfo(firstTrigger, showPi), pi)
+
+        prefs.edit()
+            .putBoolean("slot${slot}_running", true)
+            .putLong("slot${slot}_next_trigger", firstTrigger)
+            .apply()
+
         val persistIntent = Intent(this, PersistentService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(persistIntent)
         else startService(persistIntent)
+
         updateUI()
         Toast.makeText(this, "First reminder in $intervalMin min", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopSlot(slot: Int) {
+        val pi = PendingIntent.getBroadcast(
+            this, slot, Intent(this, AlarmReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        (getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pi)
+
+        val stopIntent = Intent(this, ReminderService::class.java)
+        stopIntent.action = "STOP"
+        stopIntent.putExtra("slot", slot)
+        startService(stopIntent)
+
+        prefs.edit().putBoolean("slot${slot}_running", false).apply()
+
+        // Stop persistent service only if all slots stopped
+        if (!anySlotRunning()) {
+            val persistStopIntent = Intent(this, PersistentService::class.java)
+            persistStopIntent.action = "STOP"
+            startService(persistStopIntent)
+        }
+
+        updateUI()
+        Toast.makeText(this, "Reminder $slot stopped", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopAllSlots() {
+        for (slot in 1..3) {
+            val pi = PendingIntent.getBroadcast(
+                this, slot, Intent(this, AlarmReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            (getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pi)
+            prefs.edit().putBoolean("slot${slot}_running", false).apply()
+        }
+        val stopIntent = Intent(this, ReminderService::class.java)
+        stopIntent.action = "STOP"
+        startService(stopIntent)
+        val persistStopIntent = Intent(this, PersistentService::class.java)
+        persistStopIntent.action = "STOP"
+        startService(persistStopIntent)
+        updateUI()
+        Toast.makeText(this, "All reminders stopped", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun anySlotRunning(): Boolean {
+        return (1..3).any { prefs.getBoolean("slot${it}_running", false) }
     }
 
     private fun showDefaultSettings() {
@@ -154,7 +264,6 @@ class MainActivity : AppCompatActivity() {
         spinnerRing.setSelection(selRing)
         layout.addView(spinnerRing)
 
-        // Sound picker
         val tv3 = TextView(this)
         tv3.text = "Notification sound:"
         tv3.textSize = 14f
@@ -180,7 +289,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(btnSound)
 
-        // Voice recording
         val tv4 = TextView(this)
         tv4.text = "Voice recording (optional):"
         tv4.textSize = 14f
@@ -198,11 +306,8 @@ class MainActivity : AppCompatActivity() {
         layout.addView(btnDeleteRec)
 
         btnRecord.setOnClickListener {
-            if (!isRecording) {
-                startRecording(btnRecord, btnDeleteRec)
-            } else {
-                stopRecording(btnRecord, btnDeleteRec)
-            }
+            if (!isRecording) startRecording(btnRecord, btnDeleteRec)
+            else stopRecording(btnRecord, btnDeleteRec)
         }
 
         btnDeleteRec.setOnClickListener {
@@ -255,7 +360,7 @@ class MainActivity : AppCompatActivity() {
             }
             isRecording = true
             btn.text = "🔴 Recording... (auto-stops in ${formatSec(ringSec)})"
-            Toast.makeText(this, "Recording for ${formatSec(ringSec)}...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Recording...", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Toast.makeText(this, "Mic permission needed", Toast.LENGTH_SHORT).show()
         }
@@ -287,176 +392,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showStep1Text() {
-        val input = EditText(this)
-        input.hint = "Type your reminder..."
-        input.setPadding(48, 24, 48, 24)
-        input.setText(prefs.getString("reminder_text", ""))
-
-        AlertDialog.Builder(this)
-            .setTitle("Step 1 of 4 - What to remind?")
-            .setView(input)
-            .setPositiveButton("Next") { _, _ ->
-                val text = input.text.toString().trim()
-                if (text.isEmpty()) {
-                    Toast.makeText(this, "Please enter text", Toast.LENGTH_SHORT).show()
-                } else {
-                    prefs.edit().putString("reminder_text", text).apply()
-                    showStep2StartTime()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun showStep2StartTime() {
-        val cal = Calendar.getInstance()
-        val tpd = TimePickerDialog(
-            this,
-            { _, hour, minute ->
-                prefs.edit().putInt("start_hour", hour).putInt("start_minute", minute).apply()
-                showStep3Interval()
-            },
-            cal.get(Calendar.HOUR_OF_DAY),
-            cal.get(Calendar.MINUTE),
-            false
-        )
-        tpd.setTitle("Step 2 of 4 - Start time")
-        tpd.show()
-    }
-
-    private fun showStep3Interval() {
-        val labels = arrayOf("1 min", "2 min", "3 min", "5 min", "10 min", "15 min", "30 min")
-        val values = intArrayOf(1, 2, 3, 5, 10, 15, 30)
-        var sel = values.indexOfFirst { it == prefs.getInt("interval_minutes", 1) }
-        if (sel < 0) sel = 0
-
-        AlertDialog.Builder(this)
-            .setTitle("Step 3 of 4 - Repeat every")
-            .setSingleChoiceItems(labels, sel) { _, i -> sel = i }
-            .setPositiveButton("Next") { _, _ ->
-                prefs.edit().putInt("interval_minutes", values[sel]).apply()
-                showStep4RingDuration()
-            }
-            .setNegativeButton("Back") { _, _ -> showStep2StartTime() }
-            .show()
-    }
-
-    private fun showStep4RingDuration() {
-        val labels = arrayOf("5 sec", "10 sec", "20 sec", "30 sec", "1 min", "2 min", "5 min")
-        val values = intArrayOf(5, 10, 20, 30, 60, 120, 300)
-        var sel = values.indexOfFirst { it == prefs.getInt("ring_duration_sec", 30) }
-        if (sel < 0) sel = 3
-
-        AlertDialog.Builder(this)
-            .setTitle("Step 4 of 4 - Ring for how long?")
-            .setSingleChoiceItems(labels, sel) { _, i -> sel = i }
-            .setPositiveButton("Start Reminder") { _, _ ->
-                prefs.edit().putInt("ring_duration_sec", values[sel]).apply()
-                scheduleFirstAlarm()
-            }
-            .setNegativeButton("Back") { _, _ -> showStep3Interval() }
-            .show()
-    }
-
-    private fun scheduleFirstAlarm() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            if (!am.canScheduleExactAlarms()) {
-                AlertDialog.Builder(this)
-                    .setTitle("Permission needed")
-                    .setMessage("Allow exact alarms so reminder rings at the exact time you set.")
-                    .setPositiveButton("Open Settings") { _, _ ->
-                        startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                    }
-                    .setNegativeButton("Cancel", null)
-                    .show()
-                return
-            }
-        }
-
-        val hour = prefs.getInt("start_hour", 0)
-        val minute = prefs.getInt("start_minute", 0)
-        val intervalMin = prefs.getInt("interval_minutes", 1)
-        val ringSec = prefs.getInt("ring_duration_sec", 30)
-        val text = prefs.getString("reminder_text", "") ?: ""
-
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, hour)
-        cal.set(Calendar.MINUTE, minute)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        if (cal.timeInMillis <= System.currentTimeMillis()) {
-            cal.add(Calendar.DAY_OF_YEAR, 1)
-        }
-
-        scheduleRepeating(text, intervalMin, ringSec, cal.timeInMillis)
-        prefs.edit().putBoolean("is_running", true).putLong("next_trigger", cal.timeInMillis).apply()
-        val persistIntent = Intent(this, PersistentService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(persistIntent)
-        else startService(persistIntent)
-        updateUI()
-
-        val h12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
-        val ampm = if (hour < 12) "AM" else "PM"
-        Toast.makeText(this, "First ring at %02d:%02d %s".format(h12, minute, ampm), Toast.LENGTH_LONG).show()
-    }
-
-    private fun scheduleRepeating(text: String, intervalMin: Int, ringSec: Int, firstTrigger: Long = System.currentTimeMillis()) {
-        val intent = Intent(this, AlarmReceiver::class.java)
-        intent.putExtra("reminder_text", text)
-        intent.putExtra("interval_minutes", intervalMin)
-        intent.putExtra("ring_duration_sec", ringSec)
-
-        val pi = PendingIntent.getBroadcast(
-            this, 0, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val showPi = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        am.setAlarmClock(AlarmManager.AlarmClockInfo(firstTrigger, showPi), pi)
-    }
-
-    private fun stopAll() {
-        val pi = PendingIntent.getBroadcast(
-            this, 0, Intent(this, AlarmReceiver::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        (getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pi)
-
-        val stopIntent = Intent(this, ReminderService::class.java)
-        stopIntent.action = "STOP"
-        startService(stopIntent)
-
-        val persistStopIntent = Intent(this, PersistentService::class.java)
-        persistStopIntent.action = "STOP"
-        startService(persistStopIntent)
-
-        prefs.edit().putBoolean("is_running", false).apply()
-        updateUI()
-        Toast.makeText(this, "Reminder stopped", Toast.LENGTH_SHORT).show()
-    }
-
     private fun updateUI() {
-        val running = prefs.getBoolean("is_running", false)
-        val text = prefs.getString("reminder_text", "") ?: ""
         val interval = prefs.getInt("interval_minutes", 1)
         val ringSec = prefs.getInt("ring_duration_sec", 30)
+        tvSettings.text = "Default: every $interval min  •  rings ${formatSec(ringSec)}"
 
-        tvSettings.text = "Default: every $interval min, rings ${formatSec(ringSec)}"
+        for (slot in 1..3) {
+            val running = prefs.getBoolean("slot${slot}_running", false)
+            val text = prefs.getString("slot${slot}_text", "") ?: ""
+            val name = prefs.getString("slot${slot}_name", "Reminder $slot") ?: "Reminder $slot"
 
-        if (running && text.isNotEmpty()) {
-            tvStatus.text = "ACTIVE: $text"
-            btnQuick.text = "Change Reminder"
-            btnStop.isEnabled = true
-        } else {
-            tvStatus.text = "Tap QUICK or SCHEDULED"
-            btnQuick.text = "Quick Reminder"
-            btnStop.isEnabled = false
+            val slotBtn = when (slot) { 1 -> btnSlot1; 2 -> btnSlot2; else -> btnSlot3 }
+            val stopBtn = when (slot) { 1 -> btnStop1; 2 -> btnStop2; else -> btnStop3 }
+            val renameBtn = when (slot) { 1 -> btnRename1; 2 -> btnRename2; else -> btnRename3 }
+
+            renameBtn.text = name
+            if (running && text.isNotEmpty()) {
+                slotBtn.text = "🔔 $name\n\"$text\""
+                stopBtn.isEnabled = true
+            } else {
+                slotBtn.text = "▶  $name"
+                stopBtn.isEnabled = false
+            }
         }
+
+        btnStopAll.isEnabled = anySlotRunning()
     }
 
     private fun formatSec(sec: Int): String {
