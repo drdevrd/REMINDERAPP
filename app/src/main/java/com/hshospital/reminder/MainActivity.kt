@@ -291,6 +291,13 @@ class MainActivity : AppCompatActivity() {
         lbl("DND Until:")
         val spDndEnd   = spinner(hourLabels, prefs.getInt("dnd_end_hour", 7))
 
+        lbl("Vibration:")
+        val cbVibrate = CheckBox(this)
+        cbVibrate.text = "Vibrate when reminder rings"
+        cbVibrate.isChecked = prefs.getBoolean("vibrate_enabled", false)
+        cbVibrate.textSize = 13f
+        layout.addView(cbVibrate)
+
         lbl("Voice recording (optional):")
         val hasRec = File(recordingFile).exists()
         val btnRec = Button(this).also { it.text = if (hasRec) "🎤 Re-record" else "🎤 Record Voice"; layout.addView(it) }
@@ -307,6 +314,7 @@ class MainActivity : AppCompatActivity() {
                     .putBoolean("dnd_enabled",   cbDnd.isChecked)
                     .putInt("dnd_start_hour",    spDndStart.selectedItemPosition)
                     .putInt("dnd_end_hour",      spDndEnd.selectedItemPosition)
+                    .putBoolean("vibrate_enabled", cbVibrate.isChecked)
                     .apply()
                 Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
                 updateUI()
