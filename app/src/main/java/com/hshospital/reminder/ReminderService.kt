@@ -50,11 +50,10 @@ class ReminderService : Service() {
             ACTION_PLAY_RECORDING -> { playRecording(); return START_NOT_STICKY }
         }
 
-        val text       = intent?.getStringExtra("reminder_text") ?: "Reminder"
-        val ringSec    = intent?.getIntExtra("ring_duration_sec", 30) ?: 30
-        val intervalMin= intent?.getIntExtra("interval_minutes", 1) ?: 1
+        val text        = intent?.getStringExtra("reminder_text") ?: "Reminder"
+        val ringSec     = intent?.getIntExtra("ring_duration_sec", 30) ?: 30
+        val intervalMin = intent?.getIntExtra("interval_minutes", 1) ?: 1
 
-        // Wake lock for exactly ringSec + 5 seconds
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::RingWakeLock")
         wakeLock?.acquire((ringSec + 5) * 1000L)
@@ -75,7 +74,6 @@ class ReminderService : Service() {
 
         val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
 
-        // Silent ongoing notification
         startForeground(NOTIF_ONGOING,
             NotificationCompat.Builder(this, CHANNEL_ONGOING)
                 .setContentTitle("Reminder active")
@@ -89,7 +87,6 @@ class ReminderService : Service() {
                 .build()
         )
 
-        // Ring notification — NO sound, NO vibration from channel
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val ringBuilder = NotificationCompat.Builder(this, CHANNEL_RING)
             .setContentTitle("REMINDER")
@@ -102,15 +99,13 @@ class ReminderService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setSound(null)       // no sound from notification
-            .setVibrate(null)     // no vibration from notification
+            .setSound(null)
+            .setVibrate(null)
 
-        if (hasRecording) {
-            ringBuilder.addAction(android.R.drawable.ic_media_play, "PLAY", playPi)
-        }
+        if (hasRecording) ringBuilder.addAction(android.R.drawable.ic_media_play, "PLAY", playPi)
         nm.notify(NOTIF_RING, ringBuilder.build())
 
-        // Play ringtone manually — ONLY sound source
+        // Play ringtone — only sound source
         val prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
         val savedUri = prefs.getString("ringtone_uri", null)
         val uri: Uri = if (savedUri != null) Uri.parse(savedUri)
@@ -130,14 +125,9 @@ class ReminderService : Service() {
         }
         ringtone?.play()
 
-        // Vibrate ONLY if VIBRATE_WHEN_RINGING is on
-        val vibrateWhenRinging = android.provider.Settings.System.getInt(
-            contentResolver, android.provider.Settings.System.VIBRATE_WHEN_RINGING, 0
-        )
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        val shouldVibrate = vibrateWhenRinging == 1 ||
-                audioManager.ringerMode == AudioManager.RINGER_MODE_VIBRATE
-        if (shouldVibrate) {
+        // Vibrate ONLY if user enabled it in Set Defaults
+        val vibrateEnabled = prefs.getBoolean("vibrate_enabled", false)
+        if (vibrateEnabled) {
             vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
             } else {
@@ -188,8 +178,6 @@ class ReminderService : Service() {
 
     private fun createChannels() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-
-        // Ring channel — NO sound, NO vibration
         val ringChannel = NotificationChannel(CHANNEL_RING, "Reminder Alarm", NotificationManager.IMPORTANCE_HIGH)
         ringChannel.setSound(null, null)
         ringChannel.enableVibration(false)
@@ -197,7 +185,6 @@ class ReminderService : Service() {
         ringChannel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(ringChannel)
 
-        // Ongoing channel — silent
         val ongoingChannel = NotificationChannel(CHANNEL_ONGOING, "Reminder Status", NotificationManager.IMPORTANCE_LOW)
         ongoingChannel.setSound(null, null)
         ongoingChannel.enableVibration(false)
