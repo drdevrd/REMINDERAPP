@@ -19,16 +19,15 @@ class AlarmReceiver : BroadcastReceiver() {
         val intervalMin = intent.getIntExtra("interval_minutes", prefs.getInt("interval_minutes", 1))
         val ringSec     = intent.getIntExtra("ring_duration_sec", prefs.getInt("ring_duration_sec", 30))
 
-        // Check if this slot is still running
         val runningKey = if (slot == MainActivity.SLOT_SCHEDULED) "scheduled_running" else "slot${slot}_running"
         if (!prefs.getBoolean(runningKey, false)) return
 
-        // Check DND
-        if (isInDnd(prefs)) {
-            // Skip this ring, reschedule next one
-            scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily)
-            return
-        }
+        // Schedule next ring FIRST — every X minutes regardless of daily or not
+        val nextTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
+        scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily, nextTrigger)
+
+        // Check DND — skip ring but next already scheduled
+        if (isInDnd(prefs)) return
 
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::AlarmWakeLock")
@@ -43,36 +42,26 @@ class AlarmReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(serviceIntent)
         else context.startService(serviceIntent)
 
-        scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily)
         wakeLock.release()
     }
 
     private fun isInDnd(prefs: android.content.SharedPreferences): Boolean {
         if (!prefs.getBoolean("dnd_enabled", false)) return false
-        val now       = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        val dndStart  = prefs.getInt("dnd_start_hour", 22)
-        val dndEnd    = prefs.getInt("dnd_end_hour", 7)
-        return if (dndStart > dndEnd) now >= dndStart || now < dndEnd  // overnight e.g. 10PM-7AM
+        val now      = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val dndStart = prefs.getInt("dnd_start_hour", 22)
+        val dndEnd   = prefs.getInt("dnd_end_hour", 7)
+        return if (dndStart > dndEnd) now >= dndStart || now < dndEnd
                else now >= dndStart && now < dndEnd
     }
 
-    private fun scheduleNext(context: Context, prefs: android.content.SharedPreferences,
-                              slot: Int, text: String, intervalMin: Int, ringSec: Int, daily: Boolean) {
-        val nextTrigger = if (daily) {
-            // Same time tomorrow
-            val schedHour = prefs.getInt("scheduled_hour", 8)
-            val schedMin  = prefs.getInt("scheduled_minute", 0)
-            val cal = Calendar.getInstance()
-            cal.add(Calendar.DAY_OF_YEAR, 1)
-            cal.set(Calendar.HOUR_OF_DAY, schedHour)
-            cal.set(Calendar.MINUTE, schedMin)
-            cal.set(Calendar.SECOND, 0)
-            cal.set(Calendar.MILLISECOND, 0)
-            cal.timeInMillis
-        } else {
-            System.currentTimeMillis() + intervalMin * 60 * 1000L
-        }
-
+    private fun scheduleNext(
+        context: Context,
+        prefs: android.content.SharedPreferences,
+        slot: Int, text: String,
+        intervalMin: Int, ringSec: Int,
+        daily: Boolean,
+        nextTrigger: Long
+    ) {
         val nextKey = if (slot == MainActivity.SLOT_SCHEDULED) "scheduled_next_trigger" else "slot${slot}_next_trigger"
         prefs.edit().putLong(nextKey, nextTrigger).apply()
 
@@ -83,8 +72,14 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("slot", slot)
             putExtra("daily", daily)
         }
-        val pi = PendingIntent.getBroadcast(context, slot, nextIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val showPi = PendingIntent.getActivity(context, slot, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getBroadcast(
+            context, slot, nextIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val showPi = PendingIntent.getActivity(
+            context, slot, Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.setAlarmClock(AlarmManager.AlarmClockInfo(nextTrigger, showPi), pi)
     }
