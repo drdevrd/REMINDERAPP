@@ -18,16 +18,49 @@ class AlarmReceiver : BroadcastReceiver() {
         val daily       = intent.getBooleanExtra("daily", false)
         val intervalMin = intent.getIntExtra("interval_minutes", prefs.getInt("interval_minutes", 1))
         val ringSec     = intent.getIntExtra("ring_duration_sec", prefs.getInt("ring_duration_sec", 30))
+        val afterDnd    = intent.getBooleanExtra("after_dnd", false)
 
         val runningKey = if (slot == MainActivity.SLOT_SCHEDULED) "scheduled_running" else "slot${slot}_running"
         if (!prefs.getBoolean(runningKey, false)) return
 
-        // Schedule next ring FIRST — every X minutes regardless of daily or not
-        val nextTrigger = System.currentTimeMillis() + intervalMin * 60 * 1000L
-        scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily, nextTrigger)
+        if (isInDnd(prefs)) {
+            // Schedule next check in 1 minute during DND
+            scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily,
+                System.currentTimeMillis() + 60 * 1000L, afterDnd = true)
+            return
+        }
 
-        // Check DND — skip ring but next already scheduled
-        if (isInDnd(prefs)) return
+        // Coming out of DND — add 1 minute gap per slot number to stagger
+        val dndGapMs = if (afterDnd) (slot * 60 * 1000L) else 0L
+
+        // Schedule next FIRST
+        val nextTrigger = System.currentTimeMillis() + dndGapMs + intervalMin * 60 * 1000L
+        scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily, nextTrigger, afterDnd = false)
+
+        // Wait for gap then ring
+        if (dndGapMs > 0) {
+            // Schedule a one-time ring after the gap
+            val ringIntent = Intent(context, AlarmReceiver::class.java).apply {
+                putExtra("reminder_text", text)
+                putExtra("interval_minutes", intervalMin)
+                putExtra("ring_duration_sec", ringSec)
+                putExtra("slot", slot)
+                putExtra("daily", daily)
+                putExtra("after_dnd", false)
+            }
+            val ringPi = PendingIntent.getBroadcast(
+                context, slot + 100, ringIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val showPi = PendingIntent.getActivity(
+                context, slot, Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(
+                System.currentTimeMillis() + dndGapMs, showPi), ringPi)
+            return
+        }
 
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::AlarmWakeLock")
@@ -59,8 +92,8 @@ class AlarmReceiver : BroadcastReceiver() {
         prefs: android.content.SharedPreferences,
         slot: Int, text: String,
         intervalMin: Int, ringSec: Int,
-        daily: Boolean,
-        nextTrigger: Long
+        daily: Boolean, nextTrigger: Long,
+        afterDnd: Boolean
     ) {
         val nextKey = if (slot == MainActivity.SLOT_SCHEDULED) "scheduled_next_trigger" else "slot${slot}_next_trigger"
         prefs.edit().putLong(nextKey, nextTrigger).apply()
@@ -71,6 +104,7 @@ class AlarmReceiver : BroadcastReceiver() {
             putExtra("ring_duration_sec", ringSec)
             putExtra("slot", slot)
             putExtra("daily", daily)
+            putExtra("after_dnd", afterDnd)
         }
         val pi = PendingIntent.getBroadcast(
             context, slot, nextIntent,
