@@ -32,38 +32,39 @@
             android:gravity="center"
             android:layout_marginBottom="20dp"/>
 
-        <!-- SLOT 1 -->
+        <!-- QUICK REMINDER 1 -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="QUICK REMINDERS" android:textSize="10sp" android:textColor="#4DD0E1" android:letterSpacing="0.2" android:layout_marginBottom="8dp"/>
+
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
-            <Button android:id="@+id/btnRename1" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="Reminder 1" android:textSize="12sp" android:backgroundTint="#0D2137" android:textColor="#00E5FF" android:layout_marginEnd="6dp"/>
+            <Button android:id="@+id/btnRename1" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="Quick 1" android:textSize="12sp" android:backgroundTint="#0D2137" android:textColor="#00E5FF" android:layout_marginEnd="6dp"/>
             <Button android:id="@+id/btnStop1" android:layout_width="70dp" android:layout_height="36dp" android:text="STOP" android:textSize="12sp" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false"/>
         </LinearLayout>
-        <Button android:id="@+id/btnSlot1" android:layout_width="match_parent" android:layout_height="58dp" android:text="▶  Reminder 1" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#00796B" android:textColor="#FFFFFF" android:layout_marginBottom="14dp"/>
+        <Button android:id="@+id/btnSlot1" android:layout_width="match_parent" android:layout_height="58dp" android:text="▶  Quick 1" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#00796B" android:textColor="#FFFFFF" android:layout_marginBottom="14dp"/>
 
-        <!-- SLOT 2 -->
+        <!-- QUICK REMINDER 2 -->
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
-            <Button android:id="@+id/btnRename2" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="Reminder 2" android:textSize="12sp" android:backgroundTint="#0D2137" android:textColor="#00E5FF" android:layout_marginEnd="6dp"/>
+            <Button android:id="@+id/btnRename2" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="Quick 2" android:textSize="12sp" android:backgroundTint="#0D2137" android:textColor="#00E5FF" android:layout_marginEnd="6dp"/>
             <Button android:id="@+id/btnStop2" android:layout_width="70dp" android:layout_height="36dp" android:text="STOP" android:textSize="12sp" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false"/>
         </LinearLayout>
-        <Button android:id="@+id/btnSlot2" android:layout_width="match_parent" android:layout_height="58dp" android:text="▶  Reminder 2" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#00796B" android:textColor="#FFFFFF" android:layout_marginBottom="14dp"/>
-
-        <!-- SLOT 3 -->
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
-            <Button android:id="@+id/btnRename3" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="Reminder 3" android:textSize="12sp" android:backgroundTint="#0D2137" android:textColor="#00E5FF" android:layout_marginEnd="6dp"/>
-            <Button android:id="@+id/btnStop3" android:layout_width="70dp" android:layout_height="36dp" android:text="STOP" android:textSize="12sp" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false"/>
-        </LinearLayout>
-        <Button android:id="@+id/btnSlot3" android:layout_width="match_parent" android:layout_height="58dp" android:text="▶  Reminder 3" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#00796B" android:textColor="#FFFFFF" android:layout_marginBottom="18dp"/>
+        <Button android:id="@+id/btnSlot2" android:layout_width="match_parent" android:layout_height="58dp" android:text="▶  Quick 2" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#00796B" android:textColor="#FFFFFF" android:layout_marginBottom="18dp"/>
 
         <!-- DIVIDER -->
         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#0D2137" android:layout_marginBottom="18dp"/>
 
-        <!-- SCHEDULED -->
-        <Button android:id="@+id/btnScheduled" android:layout_width="match_parent" android:layout_height="62dp" android:text="🗓  Scheduled Reminder" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#006064" android:textColor="#FFFFFF" android:layout_marginBottom="6dp"/>
-        <Button android:id="@+id/btnStopScheduled" android:layout_width="match_parent" android:layout_height="38dp" android:text="STOP SCHEDULED" android:textSize="12sp" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false" android:layout_marginBottom="18dp"/>
+        <!-- SCHEDULED REMINDERS -->
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SCHEDULED REMINDERS" android:textSize="10sp" android:textColor="#4DD0E1" android:letterSpacing="0.2" android:layout_marginBottom="8dp"/>
+
+        <!-- SCHEDULED 1 -->
+        <Button android:id="@+id/btnScheduled" android:layout_width="match_parent" android:layout_height="58dp" android:text="🗓  Scheduled 1" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#006064" android:textColor="#FFFFFF" android:layout_marginBottom="6dp"/>
+        <Button android:id="@+id/btnStopScheduled" android:layout_width="match_parent" android:layout_height="36dp" android:text="STOP SCHEDULED 1" android:textSize="12sp" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false" android:layout_marginBottom="14dp"/>
+
+        <!-- SCHEDULED 2 -->
+        <Button android:id="@+id/btnScheduled2" android:layout_width="match_parent" android:layout_height="58dp" android:text="🗓  Scheduled 2" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#006064" android:textColor="#FFFFFF" android:layout_marginBottom="6dp"/>
+        <Button android:id="@+id/btnStopScheduled2" android:layout_width="match_parent" android:layout_height="36dp" android:text="STOP SCHEDULED 2" android:textSize="12sp" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false" android:layout_marginBottom="18dp"/>
 
         <!-- DIVIDER -->
         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#0D2137" android:layout_marginBottom="18dp"/>
 
-        <!-- BOTTOM -->
         <Button android:id="@+id/btnDefaultSettings" android:layout_width="match_parent" android:layout_height="46dp" android:text="⚙   Set Defaults" android:textSize="14sp" android:backgroundTint="#0D2137" android:textColor="#4DD0E1" android:layout_marginBottom="8dp"/>
         <Button android:id="@+id/btnStopAll" android:layout_width="match_parent" android:layout_height="50dp" android:text="■   STOP ALL" android:textSize="15sp" android:textStyle="bold" android:backgroundTint="#B71C1C" android:textColor="#FFFFFF" android:enabled="false" android:layout_marginBottom="16dp"/>
 
