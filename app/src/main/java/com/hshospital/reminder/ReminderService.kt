@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -19,6 +20,7 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import java.io.File
 
@@ -31,12 +33,12 @@ class ReminderService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     companion object {
-        const val CHANNEL_RING = "reminder_ring_v3"
+        const val CHANNEL_RING    = "reminder_ring_v3"
         const val CHANNEL_ONGOING = "reminder_ongoing_v2"
-        const val NOTIF_RING = 2001
-        const val NOTIF_ONGOING = 2002
+        const val NOTIF_RING      = 2001
+        const val NOTIF_ONGOING   = 2002
         const val ACTION_PLAY_RECORDING = "PLAY_RECORDING"
-        const val ACTION_STOP = "STOP"
+        const val ACTION_STOP           = "STOP"
     }
 
     override fun onCreate() {
@@ -46,8 +48,8 @@ class ReminderService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> { cleanup(); return START_NOT_STICKY }
-            ACTION_PLAY_RECORDING -> { playRecording(); return START_NOT_STICKY }
+            ACTION_STOP            -> { cleanup(); return START_NOT_STICKY }
+            ACTION_PLAY_RECORDING  -> { playRecording(); return START_NOT_STICKY }
         }
 
         val text        = intent?.getStringExtra("reminder_text") ?: "Reminder"
@@ -71,9 +73,9 @@ class ReminderService : Service() {
             Intent(this, ReminderService::class.java).apply { action = ACTION_PLAY_RECORDING },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
         val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
 
+        // Silent ongoing
         startForeground(NOTIF_ONGOING,
             NotificationCompat.Builder(this, CHANNEL_ONGOING)
                 .setContentTitle("Reminder active")
@@ -81,28 +83,32 @@ class ReminderService : Service() {
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentIntent(openPi)
                 .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
-                .setOngoing(true)
-                .setSilent(true)
-                .setVibrate(null)
+                .setOngoing(true).setSilent(true).setVibrate(null)
                 .build()
         )
 
+        // White background notification with dark maroon text
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val ringBuilder = NotificationCompat.Builder(this, CHANNEL_RING)
-            .setContentTitle("REMINDER")
-            .setContentText("$text  •  Every $intervalMin min")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentIntent(openPi)
-            .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setSound(null)
             .setVibrate(null)
+            .setColor(Color.WHITE)
+            .setColorized(true)
+            .setContentTitle(text)
+            .setContentText("Every $intervalMin min")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .setBigContentTitle(text)
+                .bigText("Every $intervalMin min  •  Tap STOP to dismiss"))
+            .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
 
         if (hasRecording) ringBuilder.addAction(android.R.drawable.ic_media_play, "PLAY", playPi)
+
         nm.notify(NOTIF_RING, ringBuilder.build())
 
         // Play ringtone — only sound source
@@ -125,9 +131,8 @@ class ReminderService : Service() {
         }
         ringtone?.play()
 
-        // Vibrate ONLY if user enabled it in Set Defaults
-        val vibrateEnabled = prefs.getBoolean("vibrate_enabled", false)
-        if (vibrateEnabled) {
+        // Vibrate only if user enabled it
+        if (prefs.getBoolean("vibrate_enabled", false)) {
             vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
             } else {
@@ -156,8 +161,7 @@ class ReminderService : Service() {
                 setDataSource(file.absolutePath)
                 setAudioAttributes(AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build())
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 prepare(); start()
                 setOnCompletionListener { release(); mediaPlayer = null }
             }
@@ -169,8 +173,7 @@ class ReminderService : Service() {
         mediaPlayer?.release(); mediaPlayer = null
         vibrator?.cancel(); vibrator = null
         handler.removeCallbacksAndMessages(null)
-        if (wakeLock?.isHeld == true) wakeLock?.release()
-        wakeLock = null
+        if (wakeLock?.isHeld == true) wakeLock?.release(); wakeLock = null
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(NOTIF_RING); nm.cancel(NOTIF_ONGOING)
         stopForeground(true); stopSelf()
