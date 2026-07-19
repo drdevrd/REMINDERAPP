@@ -391,8 +391,8 @@ class MainActivity : AppCompatActivity() {
             val slotBtn   = if (slot == 1) btnSlot1 else btnSlot2
             val stopBtn   = if (slot == 1) btnStop1 else btnStop2
             val renameBtn = if (slot == 1) btnRename1 else btnRename2
-            renameBtn.text    = name
-            slotBtn.text      = if (running && text.isNotEmpty()) "🔔 $name\n\"$text\"" else "▶  $name"
+            renameBtn.text    = "✏ $name"
+            slotBtn.text      = if (running && text.isNotEmpty()) "🔔 $name  •  \"$text\"" else "▶  $name"
             stopBtn.isEnabled = running
         }
 
@@ -406,7 +406,7 @@ class MainActivity : AppCompatActivity() {
             val text    = prefs.getString(textKey, "") ?: ""
             val hour    = prefs.getInt(hourKey, -1)
             val min     = prefs.getInt(minKey, 0)
-            btn.text = if (running && hour >= 0) "🗓 $label\n\"$text\"  Daily ${formatHour(hour)}:${"%02d".format(min)}"
+            btn.text = if (running && hour >= 0) "🗓 $label  •  ${formatHour(hour)}:${"%02d".format(min)}\n\"$text\""
                        else "🗓  $label"
             stopBtn.isEnabled = running
         }
