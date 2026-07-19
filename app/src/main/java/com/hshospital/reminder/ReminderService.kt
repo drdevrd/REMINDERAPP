@@ -33,8 +33,8 @@ class ReminderService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     companion object {
-        const val CHANNEL_RING    = "reminder_ring_v3"
-        const val CHANNEL_ONGOING = "reminder_ongoing_v2"
+        const val CHANNEL_RING    = "reminder_ring_v4"
+        const val CHANNEL_ONGOING = "reminder_ongoing_v3"
         const val NOTIF_RING      = 2001
         const val NOTIF_ONGOING   = 2002
         const val ACTION_PLAY_RECORDING = "PLAY_RECORDING"
