@@ -44,6 +44,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStopScheduled2: Button
     private lateinit var btnDefaultSettings: Button
     private lateinit var btnStopAll: Button
+    private lateinit var tvActiveCount: TextView
+    private lateinit var tvStatus1: TextView
+    private lateinit var tvStatus2: TextView
+    private lateinit var tvStatusSched1: TextView
+    private lateinit var tvStatusSched2: TextView
+    private lateinit var cardSlot1: android.view.View
+    private lateinit var cardSlot2: android.view.View
+    private lateinit var cardSched1: android.view.View
+    private lateinit var cardSched2: android.view.View
+    private lateinit var tvActiveStatus: TextView
 
     private var mediaRecorder: MediaRecorder? = null
     private var isRecording = false
@@ -72,6 +82,16 @@ class MainActivity : AppCompatActivity() {
         btnStopScheduled2   = findViewById(R.id.btnStopScheduled2)
         btnDefaultSettings  = findViewById(R.id.btnDefaultSettings)
         btnStopAll          = findViewById(R.id.btnStopAll)
+        tvActiveCount       = findViewById(R.id.tvActiveCount)
+        tvStatus1           = findViewById(R.id.tvStatus1)
+        tvStatus2           = findViewById(R.id.tvStatus2)
+        tvStatusSched1      = findViewById(R.id.tvStatusSched1)
+        tvStatusSched2      = findViewById(R.id.tvStatusSched2)
+        cardSlot1           = findViewById(R.id.cardSlot1)
+        cardSlot2           = findViewById(R.id.cardSlot2)
+        cardSched1          = findViewById(R.id.cardSched1)
+        cardSched2          = findViewById(R.id.cardSched2)
+        tvActiveStatus      = findViewById(R.id.tvActiveStatus)
 
         requestBatteryOptimizationExemption()
         updateUI()
@@ -392,7 +412,13 @@ class MainActivity : AppCompatActivity() {
             val stopBtn   = if (slot == 1) btnStop1 else btnStop2
             val renameBtn = if (slot == 1) btnRename1 else btnRename2
             renameBtn.text    = "✏ $name"
-            slotBtn.text      = if (running && text.isNotEmpty()) "🔔 $name  •  \"$text\"" else "▶  $name"
+            if (running && text.isNotEmpty()) {
+                slotBtn.text = "🟢 ACTIVE — $name\n\"$text\""
+                slotBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#1B5E20"))
+            } else {
+                slotBtn.text = "▶  $name"
+                slotBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#00796B"))
+            }
             stopBtn.isEnabled = running
         }
 
@@ -406,14 +432,32 @@ class MainActivity : AppCompatActivity() {
             val text    = prefs.getString(textKey, "") ?: ""
             val hour    = prefs.getInt(hourKey, -1)
             val min     = prefs.getInt(minKey, 0)
-            btn.text = if (running && hour >= 0) "🗓 $label  •  ${formatHour(hour)}:${"%02d".format(min)}\n\"$text\""
-                       else "🗓  $label"
+            if (running && hour >= 0) {
+                btn.text = "🟢 ACTIVE — $label\n${formatHour(hour)}:${"%02d".format(min)}  \"$text\""
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#004D40"))
+            } else {
+                btn.text = "🗓  $label"
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#006064"))
+            }
             stopBtn.isEnabled = running
         }
 
         updateSched(SLOT_SCHEDULED,  btnScheduled,  btnStopScheduled)
         updateSched(SLOT_SCHEDULED2, btnScheduled2, btnStopScheduled2)
         btnStopAll.isEnabled = anySlotRunning()
+
+        // Active status summary
+        val activeList = mutableListOf<String>()
+        for (slot in 1..2) {
+            if (prefs.getBoolean("slot${slot}_running", false)) {
+                val n = prefs.getString("slot${slot}_name", "Quick $slot") ?: "Quick $slot"
+                activeList.add(n)
+            }
+        }
+        if (prefs.getBoolean("scheduled_running", false)) activeList.add("Scheduled 1")
+        if (prefs.getBoolean("scheduled2_running", false)) activeList.add("Scheduled 2")
+        tvActiveStatus.text = if (activeList.isEmpty()) "● No active reminders"
+                              else "🟢 RUNNING: ${activeList.joinToString(" · ")}"
     }
 
     private fun formatSec(sec: Int) = if (sec < 60) "${sec}s" else if (sec == 60) "1 min" else "${sec/60} min"
