@@ -166,7 +166,7 @@ class MainActivity : AppCompatActivity() {
         input.setText(prefs.getString(textKey, ""))
         val ringSec = prefs.getInt("ring_duration_sec", 30)
         AlertDialog.Builder(this).setTitle(slotName)
-            .setMessage("Rings daily at set time  •  Every ${prefs.getInt("interval_minutes",1)} min  •  ${formatSec(ringSec)}")
+            .setMessage("Rings daily at set time  •  Every ${prefs.getInt("sched_interval_minutes",1)} min  •  ${formatSec(prefs.getInt("sched_ring_duration_sec",30))}")
             .setView(input)
             .setPositiveButton("Pick Date & Time") { _, _ ->
                 val text = input.text.toString().trim()
@@ -189,8 +189,8 @@ class MainActivity : AppCompatActivity() {
             triggerCal.set(year, month, day, hour, minute, 0)
             triggerCal.set(Calendar.MILLISECOND, 0)
             if (triggerCal.timeInMillis <= System.currentTimeMillis()) triggerCal.add(Calendar.DAY_OF_YEAR, 1)
-            val ringSec     = prefs.getInt("ring_duration_sec", 30)
-            val intervalMin = prefs.getInt("interval_minutes", 1)
+            val ringSec     = prefs.getInt("sched_ring_duration_sec", 30)
+            val intervalMin = prefs.getInt("sched_interval_minutes", 1)
             val triggerMs   = triggerCal.timeInMillis
             val hourKey = if (slot == SLOT_SCHEDULED) "scheduled_hour" else "scheduled2_hour"
             val minKey  = if (slot == SLOT_SCHEDULED) "scheduled_minute" else "scheduled2_minute"
@@ -271,10 +271,20 @@ class MainActivity : AppCompatActivity() {
             it.setSelection(sel); layout.addView(it)
         }
 
-        lbl("Repeat every (Quick Reminder):")
+        lbl("── QUICK REMINDER ──")
+        lbl("Repeat every:")
         val spInterval = spinner(intervalLabels, selInterval)
         lbl("Ring for:")
         val spRing = spinner(ringLabels, selRing)
+
+        var selSchedInterval = intervalValues.indexOfFirst { it == prefs.getInt("sched_interval_minutes", 1) }.coerceAtLeast(0)
+        var selSchedRing     = ringValues.indexOfFirst { it == prefs.getInt("sched_ring_duration_sec", 30) }.coerceAtLeast(3)
+
+        lbl("── SCHEDULED REMINDER ──")
+        lbl("Repeat every:")
+        val spSchedInterval = spinner(intervalLabels, selSchedInterval)
+        lbl("Ring for:")
+        val spSchedRing = spinner(ringLabels, selSchedRing)
 
         lbl("Notification sound:")
         val savedUri = prefs.getString("ringtone_uri", null)
@@ -320,8 +330,10 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 if (isRecording) stopRecording(btnRec, btnDelRec)
                 prefs.edit()
-                    .putInt("interval_minutes",  intervalValues[spInterval.selectedItemPosition])
-                    .putInt("ring_duration_sec", ringValues[spRing.selectedItemPosition])
+                    .putInt("interval_minutes",       intervalValues[spInterval.selectedItemPosition])
+                    .putInt("ring_duration_sec",      ringValues[spRing.selectedItemPosition])
+                    .putInt("sched_interval_minutes", intervalValues[spSchedInterval.selectedItemPosition])
+                    .putInt("sched_ring_duration_sec",ringValues[spSchedRing.selectedItemPosition])
                     .putBoolean("vibrate_enabled", cbVibrate.isChecked)
                     .putBoolean("dnd_enabled",   cbDnd.isChecked)
                     .putInt("dnd_start_hour",    spDndStart.selectedItemPosition)
@@ -383,7 +395,9 @@ class MainActivity : AppCompatActivity() {
         val dndStart = prefs.getInt("dnd_start_hour", 22)
         val dndEnd   = prefs.getInt("dnd_end_hour", 7)
         val dndTxt   = if (dndOn) "  •  DND ${formatHour(dndStart)}-${formatHour(dndEnd)}" else ""
-        tvSettings.text = "Every $interval min  •  ${formatSec(ringSec)}$dndTxt"
+        val schedInterval = prefs.getInt("sched_interval_minutes", 1)
+        val schedRingSec  = prefs.getInt("sched_ring_duration_sec", 30)
+        tvSettings.text = "Quick: ${interval}min/${formatSec(ringSec)}  •  Sched: ${schedInterval}min/${formatSec(schedRingSec)}$dndTxt"
 
         val activeList = mutableListOf<String>()
 
