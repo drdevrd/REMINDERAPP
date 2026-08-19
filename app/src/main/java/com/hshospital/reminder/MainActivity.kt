@@ -261,9 +261,11 @@ class MainActivity : AppCompatActivity() {
         var selInterval = intervalValues.indexOfFirst { it == prefs.getInt("interval_minutes",1) }.coerceAtLeast(0)
         var selRing     = ringValues.indexOfFirst { it == prefs.getInt("ring_duration_sec",30) }.coerceAtLeast(3)
 
+        val scrollView = android.widget.ScrollView(this)
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
         layout.setPadding(48,24,48,8)
+        scrollView.addView(layout)
 
         fun lbl(t: String) = TextView(this).also { it.text = t; it.textSize = 14f; it.setPadding(0,20,0,0); layout.addView(it) }
         fun spinner(labels: Array<String>, sel: Int) = Spinner(this).also {
@@ -335,7 +337,7 @@ class MainActivity : AppCompatActivity() {
         btnRec.setOnClickListener { if (!isRecording) startRecording(btnRec, btnDelRec) else stopRecording(btnRec, btnDelRec) }
         btnDelRec.setOnClickListener { File(recordingFile).delete(); btnDelRec.isEnabled = false; btnRec.text = "🎤 Record Voice" }
 
-        AlertDialog.Builder(this).setTitle("Set Defaults").setView(layout)
+        AlertDialog.Builder(this).setTitle("Set Defaults").setView(scrollView)
             .setPositiveButton("Save") { _, _ ->
                 if (isRecording) stopRecording(btnRec, btnDelRec)
                 prefs.edit()
