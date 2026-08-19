@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="true"
@@ -29,22 +30,14 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".ReminderService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="false" />
-
-        <service
-            android:name=".PersistentService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="false" />
+        <service android:name=".ReminderService" android:foregroundServiceType="mediaPlayback" android:exported="false" />
+        <service android:name=".PersistentService" android:foregroundServiceType="mediaPlayback" android:exported="false" />
 
         <receiver android:name=".AlarmReceiver" android:exported="false" />
-        <receiver android:name=".StopReceiver" android:exported="false" />
+        <receiver android:name=".StopReceiver" android:exported="true" />
+        <receiver android:name=".SnoozeReceiver" android:exported="true" />
 
-        <receiver
-            android:name=".BootReceiver"
-            android:exported="true">
+        <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
