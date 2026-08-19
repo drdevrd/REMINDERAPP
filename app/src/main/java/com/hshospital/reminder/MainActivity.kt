@@ -307,6 +307,15 @@ class MainActivity : AppCompatActivity() {
         cbVibrate.textSize = 13f
         layout.addView(cbVibrate)
 
+        lbl("Snooze duration:")
+        val snoozeLabels = arrayOf("2 hours", "4 hours", "1 day")
+        val snoozeValues = intArrayOf(2, 4, 24)
+        var selSnooze = snoozeValues.indexOfFirst { it == prefs.getInt("snooze_hours", 2) }.coerceAtLeast(0)
+        val spSnooze = Spinner(this).also {
+            it.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, snoozeLabels)
+            it.setSelection(selSnooze); layout.addView(it)
+        }
+
         lbl("Do Not Disturb:")
         val cbDnd = CheckBox(this)
         cbDnd.text = "Enable DND (won't ring during these hours)"
@@ -335,6 +344,7 @@ class MainActivity : AppCompatActivity() {
                     .putInt("sched_interval_minutes", intervalValues[spSchedInterval.selectedItemPosition])
                     .putInt("sched_ring_duration_sec",ringValues[spSchedRing.selectedItemPosition])
                     .putBoolean("vibrate_enabled", cbVibrate.isChecked)
+                    .putInt("snooze_hours", snoozeValues[spSnooze.selectedItemPosition])
                     .putBoolean("dnd_enabled",   cbDnd.isChecked)
                     .putInt("dnd_start_hour",    spDndStart.selectedItemPosition)
                     .putInt("dnd_end_hour",      spDndEnd.selectedItemPosition)
