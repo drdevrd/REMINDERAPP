@@ -74,6 +74,25 @@ class ReminderService : Service() {
         )
         val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
 
+        // Snooze PendingIntent
+        val prefs2 = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
+        val snoozeHours = prefs2.getInt("snooze_hours", 2)
+        val snoozeIntent = Intent(this, SnoozeReceiver::class.java).apply {
+            putExtra("reminder_text", text)
+            putExtra("ring_duration_sec", ringSec)
+            putExtra("interval_minutes", intervalMin)
+            putExtra("snooze_ms", snoozeHours * 60 * 60 * 1000L)
+        }
+        val snoozePi = PendingIntent.getBroadcast(
+            this, 3, snoozeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val snoozeLabel = when (snoozeHours) {
+            24   -> "SNOOZE 1d"
+            4    -> "SNOOZE 4h"
+            else -> "SNOOZE 2h"
+        }
+
         // Silent ongoing notification
         startForeground(NOTIF_ONGOING,
             NotificationCompat.Builder(this, CHANNEL_ONGOING)
@@ -98,6 +117,7 @@ class ReminderService : Service() {
                 .setBigContentTitle(text)
                 .bigText("Every $intervalMin min  •  Tap STOP to dismiss"))
             .setContentIntent(openPi)
+            .addAction(android.R.drawable.ic_media_next, snoozeLabel, snoozePi)
             .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -112,7 +132,7 @@ class ReminderService : Service() {
         nm.notify(NOTIF_RING, ringBuilder.build())
 
         // Load saved ringtone URI — play manually, this is THE ONLY sound source
-        val prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
+        val prefs = prefs2
         val savedUri = prefs.getString("ringtone_uri", null)
         val uri: Uri = if (savedUri != null) {
             Uri.parse(savedUri)
