@@ -201,8 +201,10 @@ class ReminderService : Service() {
         if (wakeLock?.isHeld == true) wakeLock?.release()
         wakeLock = null
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancel(NOTIF_RING); nm.cancel(NOTIF_ONGOING)
-        stopForeground(true); stopSelf()
+        // Keep NOTIF_RING visible so user can tap STOP/SNOOZE/PLAY after ringing stops
+        nm.cancel(NOTIF_ONGOING)
+        stopForeground(false) // false = don't remove notification
+        stopSelf()
     }
 
     private fun createChannels() {
