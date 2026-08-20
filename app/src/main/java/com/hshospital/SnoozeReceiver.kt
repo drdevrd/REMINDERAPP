@@ -45,6 +45,10 @@ class SnoozeReceiver : BroadcastReceiver() {
             context, 99, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        // Mark snooze slot as running so AlarmReceiver doesn't skip it
+        context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("slot99_running", true).apply()
+
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerMs, showPi), pi)
 
