@@ -34,8 +34,10 @@ class ReminderService : Service() {
     companion object {
         const val CHANNEL_RING    = "reminder_ring_v5"
         const val CHANNEL_ONGOING = "reminder_ongoing_v4"
+        const val CHANNEL_STATIC  = "reminder_static_v1"
         const val NOTIF_RING      = 2001
         const val NOTIF_ONGOING   = 2002
+        const val NOTIF_STATIC    = 2003
         const val ACTION_PLAY_RECORDING = "PLAY_RECORDING"
         const val ACTION_STOP           = "STOP"
     }
@@ -57,7 +59,7 @@ class ReminderService : Service() {
 
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ReminderApp::RingWakeLock")
-        wakeLock?.acquire((ringSec + 5) * 1000L)
+        wakeLock?.acquire((ringSec + 10) * 1000L)
 
         val stopPi = PendingIntent.getBroadcast(
             this, 1, Intent(this, StopReceiver::class.java),
@@ -72,54 +74,49 @@ class ReminderService : Service() {
             Intent(this, ReminderService::class.java).apply { action = ACTION_PLAY_RECORDING },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
 
-        // Snooze PendingIntent
-        val prefs2 = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
-        val snoozeHours = prefs2.getInt("snooze_hours", 2)
+        val prefs = getSharedPreferences("reminder_prefs", MODE_PRIVATE)
+        val snoozeHours = prefs.getInt("snooze_hours", 2)
+        val snoozeMs    = snoozeHours * 60 * 60 * 1000L
+        val snoozeLabel = when (snoozeHours) { 24 -> "SNOOZE 1d"; 4 -> "SNOOZE 4h"; else -> "SNOOZE 2h" }
         val snoozeIntent = Intent(this, SnoozeReceiver::class.java).apply {
             putExtra("reminder_text", text)
             putExtra("ring_duration_sec", ringSec)
             putExtra("interval_minutes", intervalMin)
-            putExtra("snooze_ms", snoozeHours * 60 * 60 * 1000L)
+            putExtra("snooze_ms", snoozeMs)
         }
         val snoozePi = PendingIntent.getBroadcast(
             this, 3, snoozeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val snoozeLabel = when (snoozeHours) {
-            24   -> "SNOOZE 1d"
-            4    -> "SNOOZE 4h"
-            else -> "SNOOZE 2h"
-        }
 
-        // Silent ongoing notification
+        val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
+
+        // Silent ongoing foreground notification (required to keep service alive)
         startForeground(NOTIF_ONGOING,
             NotificationCompat.Builder(this, CHANNEL_ONGOING)
                 .setContentTitle("Reminder active")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
                 .setContentIntent(openPi)
-                .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
                 .setOngoing(true)
                 .setSilent(true)
                 .setVibrate(longArrayOf(0L))
                 .build()
         )
 
-        // Ring notification — completely silent, sound handled manually
+        // Ringing notification
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val ringBuilder = NotificationCompat.Builder(this, CHANNEL_RING)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(text)
             .setContentText("Every $intervalMin min  •  Tap STOP to dismiss")
-            .setStyle(NotificationCompat.BigTextStyle()
-                .setBigContentTitle(text)
-                .bigText("Every $intervalMin min  •  Tap STOP to dismiss"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(openPi)
             .addAction(android.R.drawable.ic_media_next, snoozeLabel, snoozePi)
             .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
             .setAutoCancel(false)
+            .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -131,15 +128,11 @@ class ReminderService : Service() {
         if (hasRecording) ringBuilder.addAction(android.R.drawable.ic_media_play, "PLAY", playPi)
         nm.notify(NOTIF_RING, ringBuilder.build())
 
-        // Load saved ringtone URI — play manually, this is THE ONLY sound source
-        val prefs = prefs2
+        // Play ringtone
         val savedUri = prefs.getString("ringtone_uri", null)
-        val uri: Uri = if (savedUri != null) {
-            Uri.parse(savedUri)
-        } else {
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-        }
+        val uri: Uri = if (savedUri != null) Uri.parse(savedUri)
+                       else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                           ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         ringtone = RingtoneManager.getRingtone(applicationContext, uri)
         ringtone?.let { rt ->
@@ -156,7 +149,7 @@ class ReminderService : Service() {
             rt.play()
         }
 
-        // Vibrate only if user enabled it in Set Defaults
+        // Vibrate only if enabled
         if (prefs.getBoolean("vibrate_enabled", false)) {
             vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
@@ -173,7 +166,16 @@ class ReminderService : Service() {
             }
         }
 
-        handler.postDelayed({ cleanup() }, ringSec * 1000L)
+        // Stop ringtone after ringSec — but KEEP notification visible
+        handler.postDelayed({
+            ringtone?.stop(); ringtone = null
+            vibrator?.cancel(); vibrator = null
+            if (wakeLock?.isHeld == true) wakeLock?.release(); wakeLock = null
+            // Stop foreground but keep NOTIF_RING visible
+            stopForeground(STOP_FOREGROUND_DETACH)
+            stopSelf()
+        }, ringSec * 1000L)
+
         return START_NOT_STICKY
     }
 
@@ -198,19 +200,18 @@ class ReminderService : Service() {
         mediaPlayer?.release(); mediaPlayer = null
         vibrator?.cancel(); vibrator = null
         handler.removeCallbacksAndMessages(null)
-        if (wakeLock?.isHeld == true) wakeLock?.release()
-        wakeLock = null
+        if (wakeLock?.isHeld == true) wakeLock?.release(); wakeLock = null
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        // Keep NOTIF_RING visible so user can tap STOP/SNOOZE/PLAY after ringing stops
+        nm.cancel(NOTIF_RING)
         nm.cancel(NOTIF_ONGOING)
-        stopForeground(false) // false = don't remove notification
+        nm.cancel(NOTIF_STATIC)
+        stopForeground(true)
         stopSelf()
     }
 
     private fun createChannels() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
-        // Ring channel — completely silent, no sound, no vibration
         val ringChannel = NotificationChannel(CHANNEL_RING, "Reminder Alarm", NotificationManager.IMPORTANCE_HIGH)
         ringChannel.setSound(null, null)
         ringChannel.enableVibration(false)
@@ -218,11 +219,16 @@ class ReminderService : Service() {
         ringChannel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(ringChannel)
 
-        // Ongoing channel — silent
         val ongoingChannel = NotificationChannel(CHANNEL_ONGOING, "Reminder Status", NotificationManager.IMPORTANCE_LOW)
         ongoingChannel.setSound(null, null)
         ongoingChannel.enableVibration(false)
         nm.createNotificationChannel(ongoingChannel)
+
+        val staticChannel = NotificationChannel(CHANNEL_STATIC, "Reminder Alert", NotificationManager.IMPORTANCE_HIGH)
+        staticChannel.setSound(null, null)
+        staticChannel.enableVibration(false)
+        staticChannel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        nm.createNotificationChannel(staticChannel)
     }
 
     override fun onDestroy() { cleanup(); super.onDestroy() }
