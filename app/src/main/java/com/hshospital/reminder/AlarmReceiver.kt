@@ -23,9 +23,15 @@ class AlarmReceiver : BroadcastReceiver() {
         val runningKey = when (slot) {
             MainActivity.SLOT_SCHEDULED  -> "scheduled_running"
             MainActivity.SLOT_SCHEDULED2 -> "scheduled2_running"
+            99 -> "slot99_running"
             else -> "slot${slot}_running"
         }
         if (!prefs.getBoolean(runningKey, false)) return
+
+        // Snooze slot — ring once then clear
+        if (slot == 99) {
+            prefs.edit().putBoolean("slot99_running", false).apply()
+        }
 
         if (isInDnd(prefs)) {
             scheduleNext(context, prefs, slot, text, intervalMin, ringSec, daily,
