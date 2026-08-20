@@ -8,18 +8,13 @@ import android.os.Build
 
 class StopReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-
-        // Stop ReminderService
         val stopIntent = Intent(context, ReminderService::class.java).apply { action = "STOP" }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(stopIntent)
-        } else {
-            context.startService(stopIntent)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(stopIntent)
+        else context.startService(stopIntent)
 
-        // Cancel both notifications
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(ReminderService.NOTIF_RING)
         nm.cancel(ReminderService.NOTIF_ONGOING)
+        nm.cancel(ReminderService.NOTIF_PERSIST)
     }
 }
