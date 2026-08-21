@@ -11,32 +11,17 @@ import android.widget.Toast
 
 class SnoozeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val text        = intent.getStringExtra("reminder_text") ?: return
-        val ringSec     = intent.getIntExtra("ring_duration_sec", 30)
+        val text        = intent.getStringExtra("reminder_text") ?: "Reminder"
         val intervalMin = intent.getIntExtra("interval_minutes", 1)
         val snoozeMs    = intent.getLongExtra("snooze_ms", 2 * 60 * 60 * 1000L)
         val slot        = intent.getIntExtra("slot", -1)
 
         val prefs = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
+        val ringSec = prefs.getInt(
+            if (slot == MainActivity.SLOT_SCHEDULED || slot == MainActivity.SLOT_SCHEDULED2)
+                "sched_ring_duration_sec" else "ring_duration_sec", 30
+        )
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        // Cancel ALL slots' repeating alarms to stop the ringing loop
-        for (s in listOf(1, 2, MainActivity.SLOT_SCHEDULED, MainActivity.SLOT_SCHEDULED2, 99)) {
-            val cancelPi = PendingIntent.getBroadcast(
-                context, s, Intent(context, AlarmReceiver::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            am.cancel(cancelPi)
-        }
-
-        // Mark all slots as not running
-        prefs.edit()
-            .putBoolean("slot1_running", false)
-            .putBoolean("slot2_running", false)
-            .putBoolean("scheduled_running", false)
-            .putBoolean("scheduled2_running", false)
-            .putBoolean("slot99_running", false)
-            .apply()
 
         // Stop current ring
         val stopIntent = Intent(context, ReminderService::class.java).apply { action = "STOP" }
@@ -44,12 +29,27 @@ class SnoozeReceiver : BroadcastReceiver() {
         else context.startService(stopIntent)
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancelAll()
+        nm.cancel(ReminderService.NOTIF_HIDDEN)
+        nm.cancel(ReminderService.NOTIF_ALERT)
+
+        // Cancel all repeating alarms so nothing rings until snooze ends
+        for (s in listOf(1, 2, MainActivity.SLOT_SCHEDULED, MainActivity.SLOT_SCHEDULED2, 99)) {
+            val pi = PendingIntent.getBroadcast(
+                context, s, Intent(context, AlarmReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            am.cancel(pi)
+        }
+        prefs.edit()
+            .putBoolean("slot1_running", false)
+            .putBoolean("slot2_running", false)
+            .putBoolean("scheduled_running", false)
+            .putBoolean("scheduled2_running", false)
+            .putBoolean("slot99_running", true)
+            .apply()
 
         // Schedule single ring after snooze
         val triggerMs = System.currentTimeMillis() + snoozeMs
-        prefs.edit().putBoolean("slot99_running", true).apply()
-
         val alarmIntent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("reminder_text", text)
             putExtra("ring_duration_sec", ringSec)
@@ -65,6 +65,6 @@ class SnoozeReceiver : BroadcastReceiver() {
 
         val hours = (snoozeMs / (60 * 60 * 1000)).toInt()
         val label = if (hours >= 24) "1 day" else "$hours hours"
-        Toast.makeText(context, "Snoozed for $label — all reminders paused", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Snoozed for $label", Toast.LENGTH_SHORT).show()
     }
 }
