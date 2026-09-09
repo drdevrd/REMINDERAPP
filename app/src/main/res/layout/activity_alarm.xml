@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#1A0000"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ALARM"
+        android:textSize="34sp"
+        android:textStyle="bold"
+        android:textColor="#FF5252"
+        android:letterSpacing="0.15"
+        android:layout_marginBottom="24dp"/>
+
+    <TextView
+        android:id="@+id/tvAlarmText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Reminder"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:gravity="center"
+        android:layout_marginBottom="12dp"/>
+
+    <TextView
+        android:id="@+id/tvAlarmSub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Repeats every 1 min"
+        android:textSize="16sp"
+        android:textColor="#B0B0B0"
+        android:gravity="center"
+        android:layout_marginBottom="48dp"/>
+
+    <Button
+        android:id="@+id/btnPlay"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="▶  PLAY RECORDING"
+        android:textSize="15sp"
+        android:backgroundTint="#37474F"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"/>
+
+    <Button
+        android:id="@+id/btnDone"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:text="DONE - STOP"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:backgroundTint="#2E7D32"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnSnooze"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="SNOOZE"
+        android:textSize="16sp"
+        android:backgroundTint="#455A64"
+        android:textColor="#FFFFFF"/>
+
+</LinearLayout>
