@@ -153,6 +153,17 @@ class ReminderService : Service() {
 
         val hasRecording = File(filesDir, "reminder_recording.m4a").exists()
 
+        // Wake-screen intent — same trick WhatsApp uses for incoming calls.
+        // WakeActivity briefly turns the screen on then closes itself instantly,
+        // leaving the persistent notification exactly as it was.
+        val wakeIntent = Intent(this, WakeActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+        }
+        val wakePi = PendingIntent.getActivity(
+            this, 4, wakeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ALERT)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(text)
@@ -164,12 +175,13 @@ class ReminderService : Service() {
             .setAutoCancel(false)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setSound(null)
             .setVibrate(longArrayOf(0L))
             .setColorized(true)
             .setColor(Color.WHITE)
+            .setFullScreenIntent(wakePi, true)
 
         if (hasRecording) builder.addAction(android.R.drawable.ic_media_play, "PLAY", playPi)
 
@@ -220,6 +232,7 @@ class ReminderService : Service() {
         alertChannel.enableVibration(false)
         alertChannel.vibrationPattern = longArrayOf(0L)
         alertChannel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        alertChannel.setBypassDnd(true)
         nm.createNotificationChannel(alertChannel)
     }
 
