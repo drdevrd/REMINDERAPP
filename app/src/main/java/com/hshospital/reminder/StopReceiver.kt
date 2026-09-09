@@ -15,8 +15,7 @@ class StopReceiver : BroadcastReceiver() {
         else context.startService(stopIntent)
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancel(ReminderService.NOTIF_HIDDEN)
-        nm.cancel(ReminderService.NOTIF_ALERT)
+        nm.cancel(ReminderService.NOTIF_ID)
 
         val slot = intent.getIntExtra("slot", -1)
         if (slot != -1) {
