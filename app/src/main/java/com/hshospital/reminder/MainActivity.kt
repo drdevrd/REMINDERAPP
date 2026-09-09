@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         btnStopAll         = findViewById(R.id.btnStopAll)
 
         requestBatteryOptimizationExemption()
+        requestFullScreenIntentPermission()
         updateUI()
 
         btnSlot1.setOnClickListener { showQuickDialog(1) }
@@ -90,6 +91,24 @@ class MainActivity : AppCompatActivity() {
         btnStopScheduled2.setOnClickListener { stopScheduled(SLOT_SCHEDULED2) }
         btnDefaultSettings.setOnClickListener { showDefaultSettings() }
         btnStopAll.setOnClickListener { stopAllSlots() }
+    }
+
+    private fun requestFullScreenIntentPermission() {
+        if (Build.VERSION.SDK_INT >= 34) { // Android 14 (UPSIDE_DOWN_CAKE)
+            val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (!nm.canUseFullScreenIntent()) {
+                AlertDialog.Builder(this)
+                    .setTitle("Allow screen wake")
+                    .setMessage("To wake the screen for reminders like WhatsApp calls do, please allow 'Full screen notifications' on the next screen.")
+                    .setPositiveButton("Open Settings") { _, _ ->
+                        val i = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                        i.data = Uri.parse("package:$packageName")
+                        startActivity(i)
+                    }
+                    .setNegativeButton("Skip", null)
+                    .show()
+            }
+        }
     }
 
     private fun requestBatteryOptimizationExemption() {
