@@ -3,6 +3,18 @@
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">#3949AB</item>
         <item name="colorPrimaryDark">#1A237E</item>
-        <item name="colorAccent">#7986CB</item>
+        <item name="colorAccent">#00E5FF</item>
+        <item name="alertDialogTheme">@style/AppDialog</item>
+    </style>
+
+    <!-- Popups: dark background, bright cyan buttons, white text -->
+    <style name="AppDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <item name="colorPrimary">#00E5FF</item>
+        <item name="colorAccent">#00E5FF</item>
+        <item name="colorSurface">#14202B</item>
+        <item name="android:colorBackground">#14202B</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#B0BEC5</item>
+        <item name="colorControlActivated">#00E5FF</item>
     </style>
 </resources>
