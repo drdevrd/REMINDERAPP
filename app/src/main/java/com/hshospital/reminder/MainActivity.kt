@@ -139,6 +139,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showQuickDialog(slot: Int) {
+        val running = prefs.getBoolean("slot${slot}_running", false)
+        if (running) {
+            showQuickEditMenu(slot)
+            return
+        }
         val input = EditText(this)
         input.hint = "Type your reminder..."
         input.setPadding(48, 24, 48, 24)
@@ -153,6 +158,38 @@ class MainActivity : AppCompatActivity() {
                 val text = input.text.toString().trim()
                 if (text.isEmpty()) Toast.makeText(this, "Please enter reminder text", Toast.LENGTH_SHORT).show()
                 else { prefs.edit().putString("slot${slot}_text", text).apply(); startSlot(slot, text) }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showQuickEditMenu(slot: Int) {
+        val name = prefs.getString("slot${slot}_name", "Quick $slot") ?: "Quick $slot"
+        val options = arrayOf("Edit text", "Restart with new text", "Cancel")
+        AlertDialog.Builder(this).setTitle(name)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> editQuickText(slot)
+                    1 -> editQuickText(slot, restart = true)
+                }
+            }.show()
+    }
+
+    private fun editQuickText(slot: Int, restart: Boolean = false) {
+        val input = EditText(this)
+        input.setPadding(48, 24, 48, 24)
+        input.setText(prefs.getString("slot${slot}_text", ""))
+        AlertDialog.Builder(this).setTitle("Edit text")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isEmpty()) { Toast.makeText(this, "Please enter reminder text", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+                prefs.edit().putString("slot${slot}_text", text).apply()
+                if (restart) {
+                    cancelAlarm(slot)
+                    startSlot(slot, text)
+                } else {
+                    Toast.makeText(this, "Text updated — next ring will use it", Toast.LENGTH_SHORT).show()
+                    updateUI()
+                }
             }.setNegativeButton("Cancel", null).show()
     }
 
@@ -177,6 +214,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScheduledDialog(slot: Int) {
+        val runKey = if (slot == SLOT_SCHEDULED) "scheduled_running" else "scheduled2_running"
+        if (prefs.getBoolean(runKey, false)) {
+            showScheduledEditMenu(slot)
+            return
+        }
         val slotName = if (slot == SLOT_SCHEDULED) "Scheduled 1" else "Scheduled 2"
         val input = EditText(this)
         input.hint = "Type your reminder..."
@@ -186,6 +228,70 @@ class MainActivity : AppCompatActivity() {
         val ringSec = prefs.getInt("ring_duration_sec", 30)
         AlertDialog.Builder(this).setTitle(slotName)
             .setMessage("Rings daily at set time  •  Every ${prefs.getInt("sched_interval_minutes",1)} min  •  ${formatSec(prefs.getInt("sched_ring_duration_sec",30))}")
+            .setView(input)
+            .setPositiveButton("Pick Date & Time") { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isEmpty()) Toast.makeText(this, "Please enter reminder text", Toast.LENGTH_SHORT).show()
+                else { prefs.edit().putString(textKey, text).apply(); pickDate(slot, text) }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showScheduledEditMenu(slot: Int) {
+        val slotName = if (slot == SLOT_SCHEDULED) "Scheduled 1" else "Scheduled 2"
+        val options = arrayOf("Edit text only", "Edit date & time only", "Edit both", "Cancel")
+        AlertDialog.Builder(this).setTitle(slotName)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> editScheduledText(slot)
+                    1 -> editScheduledTime(slot)
+                    2 -> editScheduledBoth(slot)
+                }
+            }.show()
+    }
+
+    private fun editScheduledText(slot: Int) {
+        val textKey = if (slot == SLOT_SCHEDULED) "scheduled_text" else "scheduled2_text"
+        val input = EditText(this)
+        input.setPadding(48, 24, 48, 24)
+        input.setText(prefs.getString(textKey, ""))
+        AlertDialog.Builder(this).setTitle("Edit text")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isEmpty()) { Toast.makeText(this, "Please enter reminder text", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+                prefs.edit().putString(textKey, text).apply()
+                // Reschedule with same time, new text
+                val hourKey = if (slot == SLOT_SCHEDULED) "scheduled_hour" else "scheduled2_hour"
+                val minKey  = if (slot == SLOT_SCHEDULED) "scheduled_minute" else "scheduled2_minute"
+                val hour = prefs.getInt(hourKey, 8)
+                val min  = prefs.getInt(minKey, 0)
+                cancelAlarm(slot)
+                val cal = Calendar.getInstance()
+                cal.set(Calendar.HOUR_OF_DAY, hour); cal.set(Calendar.MINUTE, min)
+                cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+                if (cal.timeInMillis <= System.currentTimeMillis()) cal.add(Calendar.DAY_OF_YEAR, 1)
+                val ringSec = prefs.getInt("sched_ring_duration_sec", 30)
+                val intervalMin = prefs.getInt("sched_interval_minutes", 1)
+                scheduleAlarm(slot, text, intervalMin, ringSec, cal.timeInMillis, daily = true)
+                Toast.makeText(this, "Text updated", Toast.LENGTH_SHORT).show()
+                updateUI()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun editScheduledTime(slot: Int) {
+        val textKey = if (slot == SLOT_SCHEDULED) "scheduled_text" else "scheduled2_text"
+        val text = prefs.getString(textKey, "") ?: ""
+        pickDate(slot, text)
+    }
+
+    private fun editScheduledBoth(slot: Int) {
+        val slotName = if (slot == SLOT_SCHEDULED) "Scheduled 1" else "Scheduled 2"
+        val textKey = if (slot == SLOT_SCHEDULED) "scheduled_text" else "scheduled2_text"
+        val input = EditText(this)
+        input.hint = "Type your reminder..."
+        input.setPadding(48, 24, 48, 24)
+        input.setText(prefs.getString(textKey, ""))
+        AlertDialog.Builder(this).setTitle(slotName)
             .setView(input)
             .setPositiveButton("Pick Date & Time") { _, _ ->
                 val text = input.text.toString().trim()
@@ -442,11 +548,13 @@ class MainActivity : AppCompatActivity() {
             renameBtn.text = "✏  $name"
             if (running && text.isNotEmpty()) {
                 activeList.add(name)
-                slotBtn.text = "🟢  $name\n\"$text\""
-                slotBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#1B5E20"))
+                slotBtn.text = "ACTIVE  •  $name\n$text"
+                slotBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#00E676"))
+                slotBtn.setTextColor(android.graphics.Color.parseColor("#00210F"))
             } else {
                 slotBtn.text = "▶  $name"
-                slotBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#00796B"))
+                slotBtn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#37474F"))
+                slotBtn.setTextColor(android.graphics.Color.WHITE)
             }
             stopBtn.isEnabled = running
         }
@@ -463,11 +571,13 @@ class MainActivity : AppCompatActivity() {
             val min     = prefs.getInt(minKey, 0)
             if (running && hour >= 0) {
                 activeList.add(label)
-                btn.text = "🟢  $label  •  ${formatHour(hour)}:${"%02d".format(min)}\n\"$text\""
-                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#004D40"))
+                btn.text = "ACTIVE  •  $label  •  ${formatTime(hour, min)}\n$text"
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#00E676"))
+                btn.setTextColor(android.graphics.Color.parseColor("#00210F"))
             } else {
                 btn.text = "🗓  $label"
-                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#006064"))
+                btn.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#37474F"))
+                btn.setTextColor(android.graphics.Color.WHITE)
             }
             stopBtn.isEnabled = running
         }
@@ -485,6 +595,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatSec(sec: Int) = if (sec < 60) "${sec}s" else if (sec == 60) "1 min" else "${sec/60} min"
+    private fun formatTime(h: Int, m: Int): String {
+        val a = if (h < 12) "AM" else "PM"
+        val h12 = if (h == 0) 12 else if (h > 12) h - 12 else h
+        return "%d:%02d %s".format(h12, m, a)
+    }
     private fun formatHour(h: Int): String { val a = if (h < 12) "AM" else "PM"; val h12 = if (h == 0) 12 else if (h > 12) h-12 else h; return "$h12$a" }
 
     override fun onResume() { super.onResume(); updateUI() }
