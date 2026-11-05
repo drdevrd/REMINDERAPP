@@ -12,9 +12,18 @@ import java.util.Calendar
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        val text        = intent.getStringExtra("reminder_text") ?: return
+        val extraText   = intent.getStringExtra("reminder_text") ?: return
         val prefs       = context.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
         val slot        = intent.getIntExtra("slot", 1)
+        // Always use the LATEST saved text (so edits take effect), fall back to the baked-in text
+        val textKey = when (slot) {
+            MainActivity.SLOT_SCHEDULED  -> "scheduled_text"
+            MainActivity.SLOT_SCHEDULED2 -> "scheduled2_text"
+            99 -> null
+            else -> "slot${slot}_text"
+        }
+        val savedText = if (textKey != null) prefs.getString(textKey, null) else null
+        val text = if (!savedText.isNullOrBlank()) savedText else extraText
         val daily       = intent.getBooleanExtra("daily", false)
         val afterDnd    = intent.getBooleanExtra("after_dnd", false)
         val intervalMin = intent.getIntExtra("interval_minutes", prefs.getInt("interval_minutes", 1))
