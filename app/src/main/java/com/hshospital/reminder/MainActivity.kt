@@ -398,9 +398,23 @@ class MainActivity : AppCompatActivity() {
             it.setSelection(sel); layout.addView(it)
         }
 
+        // Custom minutes box: if filled, it overrides the list above it
+        fun customBox(current: Int) = EditText(this).also {
+            it.hint = "OR type any minutes (e.g. 45, 90, 240)"
+            it.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            it.textSize = 14f
+            if (current !in intervalValues) it.setText(current.toString())
+            layout.addView(it)
+        }
+        fun pickMinutes(et: EditText, sp: Spinner): Int {
+            val typed = et.text.toString().trim().toIntOrNull()
+            return if (typed != null && typed in 1..10080) typed else intervalValues[sp.selectedItemPosition]
+        }
+
         lbl("── QUICK REMINDER ──")
         lbl("Repeat every:")
         val spInterval = spinner(intervalLabels, selInterval)
+        val etInterval = customBox(prefs.getInt("interval_minutes", 1))
         lbl("Ring for:")
         val spRing = spinner(ringLabels, selRing)
 
@@ -410,6 +424,7 @@ class MainActivity : AppCompatActivity() {
         lbl("── SCHEDULED REMINDER ──")
         lbl("Repeat every:")
         val spSchedInterval = spinner(intervalLabels, selSchedInterval)
+        val etSchedInterval = customBox(prefs.getInt("sched_interval_minutes", 1))
         lbl("Ring for:")
         val spSchedRing = spinner(ringLabels, selSchedRing)
 
@@ -466,9 +481,9 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 if (isRecording) stopRecording(btnRec, btnDelRec)
                 prefs.edit()
-                    .putInt("interval_minutes",       intervalValues[spInterval.selectedItemPosition])
+                    .putInt("interval_minutes",       pickMinutes(etInterval, spInterval))
                     .putInt("ring_duration_sec",      ringValues[spRing.selectedItemPosition])
-                    .putInt("sched_interval_minutes", intervalValues[spSchedInterval.selectedItemPosition])
+                    .putInt("sched_interval_minutes", pickMinutes(etSchedInterval, spSchedInterval))
                     .putInt("sched_ring_duration_sec",ringValues[spSchedRing.selectedItemPosition])
                     .putBoolean("vibrate_enabled", cbVibrate.isChecked)
                     .putInt("snooze_hours", snoozeValues[spSnooze.selectedItemPosition])
