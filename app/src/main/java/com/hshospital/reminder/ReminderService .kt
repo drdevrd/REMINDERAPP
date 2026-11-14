@@ -34,7 +34,7 @@ class ReminderService : Service() {
 
     companion object {
         const val CHANNEL_HIDDEN = "reminder_hidden_v2"
-        const val CHANNEL_LIST   = "reminder_list_v2"
+        const val CHANNEL_LIST   = "reminder_list_v3"
         const val NOTIF_HIDDEN   = 5001
         const val NOTIF_ID       = 5002
         const val ACTION_PLAY_RECORDING = "PLAY_RECORDING"
@@ -165,15 +165,16 @@ class ReminderService : Service() {
 
         val b = NotificationCompat.Builder(this, CHANNEL_LIST)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle(text)
-            .setContentText("Every $intervalMin min")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentTitle("Reminder")
+            .setContentText(text)
+            .setTicker(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text).setSummaryText("Every $intervalMin min"))
             .setContentIntent(openPi)
             .addAction(android.R.drawable.ic_media_next, snoozeLabel, snoozePi)
             .addAction(android.R.drawable.ic_delete, "STOP", stopPi)
             .setAutoCancel(false)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)   // DEFAULT = no banner popup
+            .setPriority(NotificationCompat.PRIORITY_HIGH)   // HIGH = banner shows the reminder text
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setSound(null)
@@ -221,8 +222,9 @@ class ReminderService : Service() {
         hidden.setSound(null, null); hidden.enableVibration(false); hidden.setShowBadge(false)
         nm.createNotificationChannel(hidden)
 
-        // IMPORTANCE_DEFAULT = shows in list, NO heads-up banner
-        val list = NotificationChannel(CHANNEL_LIST, "Reminder", NotificationManager.IMPORTANCE_DEFAULT)
+        // IMPORTANCE_HIGH = banner at top shows the full reminder text
+        nm.deleteNotificationChannel("reminder_list_v2")
+        val list = NotificationChannel(CHANNEL_LIST, "Reminder", NotificationManager.IMPORTANCE_HIGH)
         list.setSound(null, null)
         list.enableVibration(false)
         list.vibrationPattern = longArrayOf(0L)
